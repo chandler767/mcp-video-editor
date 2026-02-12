@@ -16,6 +16,7 @@ import { MultiTakeProjectManager } from './multi-take/multi-take-manager.js';
 import { MultiTakeAnalyzer } from './multi-take/multi-take-analyzer.js';
 import { BestTakeSelector } from './multi-take/multi-take-selector.js';
 import { ReportGenerator } from './utils/report-generator.js';
+import { TextOperations } from './text-operations.js';
 
 const server = new Server(
   {
@@ -33,6 +34,7 @@ const ffmpegManager = new FFmpegManager();
 const configManager = new ConfigManager();
 let videoOps: VideoOperations;
 let transcriptOps: TranscriptOperations;
+let textOps: TextOperations;
 let multiTakeManager: MultiTakeProjectManager;
 let multiTakeAnalyzer: MultiTakeAnalyzer;
 let bestTakeSelector: BestTakeSelector;
@@ -53,6 +55,7 @@ async function initialize() {
   const config = configManager.get();
   videoOps = new VideoOperations(ffmpegManager, config);
   transcriptOps = new TranscriptOperations(config.openaiApiKey, ffmpegManager);
+  textOps = new TextOperations(ffmpegManager);
   multiTakeManager = new MultiTakeProjectManager(process.cwd());
   multiTakeAnalyzer = new MultiTakeAnalyzer(config);
   bestTakeSelector = new BestTakeSelector();
@@ -627,6 +630,239 @@ const tools: Tool[] = [
         },
       },
       required: ['projectId'],
+    },
+  },
+  {
+    name: 'add_text_overlay',
+    description: 'Add text overlay to video with styling, positioning, and timing options. Great for titles, captions, watermarks.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        output: {
+          type: 'string',
+          description: 'Output video file path',
+        },
+        text: {
+          type: 'string',
+          description: 'Text to display',
+        },
+        position: {
+          type: 'string',
+          enum: ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'],
+          description: 'Text position preset (default: bottom-center)',
+        },
+        x: {
+          type: 'number',
+          description: 'Custom X coordinate (overrides position preset)',
+        },
+        y: {
+          type: 'number',
+          description: 'Custom Y coordinate (overrides position preset)',
+        },
+        startTime: {
+          type: 'number',
+          description: 'Start time in seconds (when text appears)',
+        },
+        endTime: {
+          type: 'number',
+          description: 'End time in seconds (when text disappears)',
+        },
+        duration: {
+          type: 'number',
+          description: 'Duration in seconds (alternative to endTime)',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Font size in pixels (default: 24)',
+        },
+        fontColor: {
+          type: 'string',
+          description: 'Font color name or hex (e.g., "white", "0xFFFFFF") (default: white)',
+        },
+        fontFile: {
+          type: 'string',
+          description: 'Path to custom font file (.ttf)',
+        },
+        borderWidth: {
+          type: 'number',
+          description: 'Border/outline width in pixels',
+        },
+        borderColor: {
+          type: 'string',
+          description: 'Border color (default: black)',
+        },
+        shadowX: {
+          type: 'number',
+          description: 'Shadow X offset in pixels',
+        },
+        shadowY: {
+          type: 'number',
+          description: 'Shadow Y offset in pixels',
+        },
+        shadowColor: {
+          type: 'string',
+          description: 'Shadow color (default: black)',
+        },
+        box: {
+          type: 'boolean',
+          description: 'Add background box for better readability',
+        },
+        boxColor: {
+          type: 'string',
+          description: 'Box background color (default: black)',
+        },
+        boxOpacity: {
+          type: 'number',
+          description: 'Box opacity 0-1 (default: 0.5)',
+        },
+        fadeIn: {
+          type: 'number',
+          description: 'Fade in duration in seconds',
+        },
+        fadeOut: {
+          type: 'number',
+          description: 'Fade out duration in seconds',
+        },
+      },
+      required: ['input', 'output', 'text'],
+    },
+  },
+  {
+    name: 'add_animated_text',
+    description: 'Add animated text overlay to video with motion effects (slide, fade, zoom)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        output: {
+          type: 'string',
+          description: 'Output video file path',
+        },
+        text: {
+          type: 'string',
+          description: 'Text to display',
+        },
+        animation: {
+          type: 'string',
+          enum: ['fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'zoom'],
+          description: 'Animation type',
+        },
+        animationDuration: {
+          type: 'number',
+          description: 'Animation duration in seconds (default: 1)',
+        },
+        position: {
+          type: 'string',
+          enum: ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'],
+          description: 'Final text position (default: center)',
+        },
+        startTime: {
+          type: 'number',
+          description: 'Start time in seconds',
+        },
+        endTime: {
+          type: 'number',
+          description: 'End time in seconds',
+        },
+        duration: {
+          type: 'number',
+          description: 'Total display duration in seconds',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Font size in pixels (default: 24)',
+        },
+        fontColor: {
+          type: 'string',
+          description: 'Font color (default: white)',
+        },
+        fontFile: {
+          type: 'string',
+          description: 'Path to custom font file',
+        },
+        borderWidth: {
+          type: 'number',
+          description: 'Border width in pixels',
+        },
+        borderColor: {
+          type: 'string',
+          description: 'Border color (default: black)',
+        },
+        box: {
+          type: 'boolean',
+          description: 'Add background box',
+        },
+        boxColor: {
+          type: 'string',
+          description: 'Box color (default: black)',
+        },
+        boxOpacity: {
+          type: 'number',
+          description: 'Box opacity 0-1 (default: 0.5)',
+        },
+      },
+      required: ['input', 'output', 'text', 'animation'],
+    },
+  },
+  {
+    name: 'burn_subtitles',
+    description: 'Burn subtitles from SRT/VTT file permanently into video',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        output: {
+          type: 'string',
+          description: 'Output video file path',
+        },
+        subtitleFile: {
+          type: 'string',
+          description: 'Path to subtitle file (.srt, .vtt, or .ass)',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Font size for subtitles',
+        },
+        fontColor: {
+          type: 'string',
+          description: 'Font color for subtitles',
+        },
+        fontFile: {
+          type: 'string',
+          description: 'Path to custom font file',
+        },
+        borderWidth: {
+          type: 'number',
+          description: 'Border width',
+        },
+        borderColor: {
+          type: 'string',
+          description: 'Border color',
+        },
+        box: {
+          type: 'boolean',
+          description: 'Add background box',
+        },
+        boxColor: {
+          type: 'string',
+          description: 'Box color',
+        },
+        boxOpacity: {
+          type: 'number',
+          description: 'Box opacity 0-1',
+        },
+      },
+      required: ['input', 'output', 'subtitleFile'],
     },
   },
 ];
@@ -1362,6 +1598,102 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: result.cleaned
                 ? `Temporary files cleaned!\n\nDeleted: ${result.deletedCount} file(s)\nFreed space: ${((result.freedSpace || 0) / 1024 / 1024).toFixed(2)} MB`
                 : `Cleanup skipped: ${result.reason}`,
+            },
+          ],
+        };
+      }
+
+      case 'add_text_overlay': {
+        const result = await textOps.addTextOverlay({
+          input: args.input as string,
+          output: args.output as string,
+          text: args.text as string,
+          position: args.position as any,
+          x: args.x as number | undefined,
+          y: args.y as number | undefined,
+          startTime: args.startTime as number | undefined,
+          endTime: args.endTime as number | undefined,
+          duration: args.duration as number | undefined,
+          fontSize: args.fontSize as number | undefined,
+          fontColor: args.fontColor as string | undefined,
+          fontFile: args.fontFile as string | undefined,
+          borderWidth: args.borderWidth as number | undefined,
+          borderColor: args.borderColor as string | undefined,
+          shadowX: args.shadowX as number | undefined,
+          shadowY: args.shadowY as number | undefined,
+          shadowColor: args.shadowColor as string | undefined,
+          box: args.box as boolean | undefined,
+          boxColor: args.boxColor as string | undefined,
+          boxOpacity: args.boxOpacity as number | undefined,
+          fadeIn: args.fadeIn as number | undefined,
+          fadeOut: args.fadeOut as number | undefined,
+        });
+
+        const timingInfo = args.startTime !== undefined
+          ? `\nTiming: ${args.startTime}s - ${args.endTime || (Number(args.startTime) + (Number(args.duration) || 0))}s`
+          : '';
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Text overlay added successfully!\n\nOutput: ${result}\nText: "${args.text}"\nPosition: ${args.position || 'custom'}${timingInfo}`,
+            },
+          ],
+        };
+      }
+
+      case 'add_animated_text': {
+        const result = await textOps.addAnimatedText({
+          input: args.input as string,
+          output: args.output as string,
+          text: args.text as string,
+          animation: args.animation as any,
+          animationDuration: args.animationDuration as number | undefined,
+          position: args.position as any,
+          startTime: args.startTime as number | undefined,
+          endTime: args.endTime as number | undefined,
+          duration: args.duration as number | undefined,
+          fontSize: args.fontSize as number | undefined,
+          fontColor: args.fontColor as string | undefined,
+          fontFile: args.fontFile as string | undefined,
+          borderWidth: args.borderWidth as number | undefined,
+          borderColor: args.borderColor as string | undefined,
+          box: args.box as boolean | undefined,
+          boxColor: args.boxColor as string | undefined,
+          boxOpacity: args.boxOpacity as number | undefined,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Animated text added successfully!\n\nOutput: ${result}\nAnimation: ${args.animation}\nText: "${args.text}"`,
+            },
+          ],
+        };
+      }
+
+      case 'burn_subtitles': {
+        const result = await textOps.burnSubtitles({
+          input: args.input as string,
+          output: args.output as string,
+          subtitleFile: args.subtitleFile as string,
+          fontSize: args.fontSize as number | undefined,
+          fontColor: args.fontColor as string | undefined,
+          fontFile: args.fontFile as string | undefined,
+          borderWidth: args.borderWidth as number | undefined,
+          borderColor: args.borderColor as string | undefined,
+          box: args.box as boolean | undefined,
+          boxColor: args.boxColor as string | undefined,
+          boxOpacity: args.boxOpacity as number | undefined,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Subtitles burned successfully!\n\nOutput: ${result}\nSubtitle file: ${args.subtitleFile}`,
             },
           ],
         };
