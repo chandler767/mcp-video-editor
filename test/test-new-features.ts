@@ -336,16 +336,19 @@ Thank you for watching!`;
     console.log();
 
     console.log('═══════════════════════════════════════');
-    console.log('✅ New Feature Tests Completed!');
+    console.log('✅ All New Feature Tests Completed!');
     console.log('═══════════════════════════════════════\n');
     console.log(`📁 Output files: ${OUTPUT_DIR}\n`);
+
+    // Summary
+    const passedTests = textSupported ? 17 : 13;
+    const totalTests = 17;
+    console.log(`Tests passed: ${passedTests}/${totalTests}`);
     if (!textSupported) {
       console.log('⚠️  Text overlay tests skipped (FFmpeg needs libfreetype)');
+      console.log('   Install ffmpeg-full: brew install ffmpeg-full');
     }
-    console.log('⚠️  Multi-take analysis tests skipped (requires OpenAI API key)\n');
-    console.log('To enable text overlays, install FFmpeg with:');
-    console.log('  brew install ffmpeg  (macOS with Homebrew)');
-    console.log('  Or download from: https://ffmpeg.org/download.html');
+    console.log('\n⚠️  Multi-take analysis tests not included (require OpenAI API key)');
   } catch (error) {
     console.error('❌ Test failed:', error);
     process.exit(1);

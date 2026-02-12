@@ -1,0 +1,36 @@
+{
+  "id": "adbcfc7b-94bf-40b5-8de5-f7076dbd3bdb",
+  "name": "Test Edit Timeline",
+  "created": "2026-02-12T22:20:27.631Z",
+  "modified": "2026-02-12T22:20:27.652Z",
+  "currentIndex": 0,
+  "operations": [
+    {
+      "id": "cff21c09-e0b1-43f5-9612-34a7f1864e27",
+      "timestamp": "2026-02-12T22:20:27.634Z",
+      "operation": "trim",
+      "description": "Trimmed intro",
+      "input": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/videos/test-1080p.mp4",
+      "output": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/timeline-trim.mp4",
+      "parameters": {
+        "startTime": 2,
+        "duration": 5
+      },
+      "status": "completed"
+    },
+    {
+      "id": "434ea1bf-ad31-48b3-a55f-0fc4fd20916c",
+      "timestamp": "2026-02-12T22:20:27.635Z",
+      "operation": "add_text",
+      "description": "Added title",
+      "input": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/timeline-trim.mp4",
+      "output": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/timeline-with-text.mp4",
+      "parameters": {
+        "text": "Title",
+        "position": "top-center"
+      },
+      "status": "completed"
+    }
+  ],
+  "baseFile": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/videos/test-1080p.mp4"
+}

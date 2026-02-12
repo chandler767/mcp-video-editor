@@ -28,7 +28,10 @@
       "Bash(git fetch:*)",
       "Bash(wc:*)",
       "Bash(/Users/chandler.mayo/Desktop/mcp-editor/TESTING.md << 'EOF'\n# Testing Guide\n\nThis document describes all available tests for the MCP Video Editor.\n\n## Test Suite Overview\n\nThe MCP Video Editor has comprehensive test coverage for all major features:\n\n- **Basic Video Operations** - Trim, resize, concatenate, extract audio/frames\n- **Text Overlays & Animations** - Static text, animated text, subtitle burning\n- **Timeline System** - Undo/redo, operation tracking, jump-to-point\n- **Multi-Take Editing** - Project management, take analysis, best-take selection\n- **Transcript Operations** - Speech-to-text, script matching\n\n## Running Tests\n\n### Prerequisites\n\n1. Build the project first:\n```bash\nnpm run build\n```\n\n2. For transcript tests, set OpenAI API key:\n```bash\nexport OPENAI_API_KEY=your_api_key_here\n```\n\n### Available Test Commands\n\n```bash\n# Generate test video files\nnpm run test:generate\n\n# Run basic video operation tests\nnpm run test:run\n\n# Run transcript operation tests \\(requires OpenAI API key\\)\nnpm run test:transcript\n\n# Run new features tests \\(text, timeline, multi-take\\)\nnpm run test:new\n\n# Run all tests except transcript \\(no API key needed\\)\nnpm test\n\n# Run ALL tests including transcript tests \\(requires API key\\)\nnpm run test:all\n```\n\n## Test Coverage Summary\n\n✅ **17 tests** for new features \\(text, timeline, multi-take\\)\n✅ **11 tests** for basic video operations  \n⚠️  **6 tests** for transcript features \\(require OpenAI API key\\)\n\n**Total: 34 test cases**\nEOF)",
-      "Bash(npm run test:new:*)"
+      "Bash(npm run test:new:*)",
+      "Bash(brew search:*)",
+      "Bash(brew info:*)",
+      "Bash(ls:*)"
     ]
   }
 }

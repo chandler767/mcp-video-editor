@@ -20,39 +20,51 @@ export class FFmpegManager {
       return this.getInfo();
     }
 
-    try {
-      // First, check if ffmpeg is in PATH
-      const { stdout } = await execFileAsync('ffmpeg', ['-version']);
-      const versionMatch = stdout.match(/ffmpeg version ([^\s]+)/);
-      this.ffmpegPath = 'ffmpeg';
-      this.initialized = true;
+    // Try ffmpeg-full first (has all features including drawtext)
+    const ffmpegPaths = [
+      '/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg',  // macOS Homebrew ffmpeg-full
+      '/usr/local/opt/ffmpeg-full/bin/ffmpeg',     // macOS Homebrew (Intel)
+      'ffmpeg',                                     // System PATH
+    ];
 
-      return {
-        available: true,
-        version: versionMatch ? versionMatch[1] : 'unknown',
-        path: 'ffmpeg (system)'
-      };
-    } catch (error) {
-      // System ffmpeg not found, use bundled version
+    for (const path of ffmpegPaths) {
       try {
-        this.ffmpegPath = ffmpegInstaller.path;
-        ffmpeg.setFfmpegPath(this.ffmpegPath);
-
-        const { stdout } = await execFileAsync(this.ffmpegPath, ['-version']);
+        const { stdout } = await execFileAsync(path, ['-version']);
         const versionMatch = stdout.match(/ffmpeg version ([^\s]+)/);
+        this.ffmpegPath = path;
+        ffmpeg.setFfmpegPath(this.ffmpegPath);
         this.initialized = true;
 
         return {
           available: true,
           version: versionMatch ? versionMatch[1] : 'unknown',
-          path: this.ffmpegPath
+          path: path === 'ffmpeg' ? 'ffmpeg (system)' : path
         };
-      } catch (bundledError) {
-        this.initialized = false;
-        return {
-          available: false
-        };
+      } catch (error) {
+        // Try next path
+        continue;
       }
+    }
+
+    // If none of the above work, try bundled version as last resort
+    try {
+      this.ffmpegPath = ffmpegInstaller.path;
+      ffmpeg.setFfmpegPath(this.ffmpegPath);
+
+      const { stdout } = await execFileAsync(this.ffmpegPath, ['-version']);
+      const versionMatch = stdout.match(/ffmpeg version ([^\s]+)/);
+      this.initialized = true;
+
+      return {
+        available: true,
+        version: versionMatch ? versionMatch[1] : 'unknown',
+        path: this.ffmpegPath
+      };
+    } catch (bundledError) {
+      this.initialized = false;
+      return {
+        available: false
+      };
     }
   }
 
