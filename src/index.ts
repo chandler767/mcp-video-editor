@@ -17,6 +17,7 @@ import { MultiTakeAnalyzer } from './multi-take/multi-take-analyzer.js';
 import { BestTakeSelector } from './multi-take/multi-take-selector.js';
 import { ReportGenerator } from './utils/report-generator.js';
 import { TextOperations } from './text-operations.js';
+import { TimelineManager } from './timeline-manager.js';
 
 const server = new Server(
   {
@@ -35,6 +36,7 @@ const configManager = new ConfigManager();
 let videoOps: VideoOperations;
 let transcriptOps: TranscriptOperations;
 let textOps: TextOperations;
+let timelineManager: TimelineManager;
 let multiTakeManager: MultiTakeProjectManager;
 let multiTakeAnalyzer: MultiTakeAnalyzer;
 let bestTakeSelector: BestTakeSelector;
@@ -56,6 +58,7 @@ async function initialize() {
   videoOps = new VideoOperations(ffmpegManager, config);
   transcriptOps = new TranscriptOperations(config.openaiApiKey, ffmpegManager);
   textOps = new TextOperations(ffmpegManager);
+  timelineManager = new TimelineManager(process.cwd());
   multiTakeManager = new MultiTakeProjectManager(process.cwd());
   multiTakeAnalyzer = new MultiTakeAnalyzer(config);
   bestTakeSelector = new BestTakeSelector();
@@ -863,6 +866,140 @@ const tools: Tool[] = [
         },
       },
       required: ['input', 'output', 'subtitleFile'],
+    },
+  },
+  {
+    name: 'create_timeline',
+    description: 'Create a new editing timeline to track operations and enable undo/redo',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Timeline name',
+        },
+        baseFile: {
+          type: 'string',
+          description: 'Base video file (starting point)',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'add_to_timeline',
+    description: 'Record an operation to timeline (automatically tracks changes for undo/redo)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timelineId: {
+          type: 'string',
+          description: 'Timeline ID',
+        },
+        operation: {
+          type: 'string',
+          description: 'Operation name (e.g., "trim", "add_text", "concatenate")',
+        },
+        description: {
+          type: 'string',
+          description: 'Human-readable description of what was done',
+        },
+        input: {
+          type: ['string', 'array'],
+          description: 'Input file path(s)',
+        },
+        output: {
+          type: 'string',
+          description: 'Output file path',
+        },
+        parameters: {
+          type: 'object',
+          description: 'Operation parameters as JSON object',
+        },
+      },
+      required: ['timelineId', 'operation', 'description', 'input', 'output'],
+    },
+  },
+  {
+    name: 'undo_operation',
+    description: 'Undo the last operation in timeline (moves back one step)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timelineId: {
+          type: 'string',
+          description: 'Timeline ID',
+        },
+      },
+      required: ['timelineId'],
+    },
+  },
+  {
+    name: 'redo_operation',
+    description: 'Redo the next operation in timeline (moves forward one step)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timelineId: {
+          type: 'string',
+          description: 'Timeline ID',
+        },
+      },
+      required: ['timelineId'],
+    },
+  },
+  {
+    name: 'view_timeline',
+    description: 'View timeline history showing all operations, current position, and undo/redo availability',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timelineId: {
+          type: 'string',
+          description: 'Timeline ID',
+        },
+      },
+      required: ['timelineId'],
+    },
+  },
+  {
+    name: 'jump_to_timeline_point',
+    description: 'Jump to a specific point in timeline by operation index',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timelineId: {
+          type: 'string',
+          description: 'Timeline ID',
+        },
+        index: {
+          type: 'number',
+          description: 'Operation index to jump to (0-based, -1 for base file)',
+        },
+      },
+      required: ['timelineId', 'index'],
+    },
+  },
+  {
+    name: 'list_timelines',
+    description: 'List all editing timelines',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_timeline_stats',
+    description: 'Get statistics about timeline operations (total, completed, failed, duration, etc.)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timelineId: {
+          type: 'string',
+          description: 'Timeline ID',
+        },
+      },
+      required: ['timelineId'],
     },
   },
 ];
@@ -1694,6 +1831,207 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Subtitles burned successfully!\n\nOutput: ${result}\nSubtitle file: ${args.subtitleFile}`,
+            },
+          ],
+        };
+      }
+
+      case 'create_timeline': {
+        const name = args.name as string;
+        const baseFile = args.baseFile as string | undefined;
+
+        const timeline = await timelineManager.createTimeline(name, baseFile);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Timeline created successfully!\n\nTimeline ID: ${timeline.id}\nName: ${timeline.name}${baseFile ? `\nBase file: ${baseFile}` : ''}\n\nUse add_to_timeline to record operations and enable undo/redo.`,
+            },
+          ],
+        };
+      }
+
+      case 'add_to_timeline': {
+        const timelineId = args.timelineId as string;
+        const operation = args.operation as string;
+        const description = args.description as string;
+        const input = args.input as string | string[];
+        const output = args.output as string;
+        const parameters = (args.parameters as Record<string, any>) || {};
+
+        const timeline = await timelineManager.addOperation(
+          timelineId,
+          operation,
+          description,
+          input,
+          output,
+          parameters
+        );
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Operation added to timeline!\n\nOperation: ${operation}\nDescription: ${description}\nOutput: ${output}\n\nTimeline position: ${timeline.currentIndex + 1}/${timeline.operations.length}\n\nUse undo_operation to revert this change.`,
+            },
+          ],
+        };
+      }
+
+      case 'undo_operation': {
+        const timelineId = args.timelineId as string;
+
+        const { timeline, previousOutput } = await timelineManager.undo(timelineId);
+
+        if (!previousOutput) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Already at the beginning of timeline. Cannot undo further.',
+              },
+            ],
+          };
+        }
+
+        const currentOp = timeline.currentIndex >= 0
+          ? timeline.operations[timeline.currentIndex]
+          : null;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Undo successful!\n\n${currentOp ? `Current state: ${currentOp.description}\nCurrent file: ${currentOp.output}` : `Reverted to base file: ${previousOutput}`}\n\nPosition: ${timeline.currentIndex + 1}/${timeline.operations.length}\n\n${timeline.currentIndex < timeline.operations.length - 1 ? 'Use redo_operation to move forward.' : ''}`,
+            },
+          ],
+        };
+      }
+
+      case 'redo_operation': {
+        const timelineId = args.timelineId as string;
+
+        const { timeline, nextOutput } = await timelineManager.redo(timelineId);
+
+        if (!nextOutput) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Already at the end of timeline. Cannot redo further.',
+              },
+            ],
+          };
+        }
+
+        const currentOp = timeline.operations[timeline.currentIndex];
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Redo successful!\n\nCurrent state: ${currentOp.description}\nCurrent file: ${currentOp.output}\n\nPosition: ${timeline.currentIndex + 1}/${timeline.operations.length}`,
+            },
+          ],
+        };
+      }
+
+      case 'view_timeline': {
+        const timelineId = args.timelineId as string;
+
+        const history = await timelineManager.getTimelineHistory(timelineId);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: history,
+            },
+          ],
+        };
+      }
+
+      case 'jump_to_timeline_point': {
+        const timelineId = args.timelineId as string;
+        const index = args.index as number;
+
+        const { timeline, output } = await timelineManager.jumpTo(timelineId, index);
+
+        const targetOp = index >= 0 ? timeline.operations[index] : null;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Jumped to timeline point ${index + 1}!\n\n${targetOp ? `State: ${targetOp.description}\nFile: ${targetOp.output}` : `Jumped to base file: ${output}`}\n\nPosition: ${timeline.currentIndex + 1}/${timeline.operations.length}`,
+            },
+          ],
+        };
+      }
+
+      case 'list_timelines': {
+        const timelines = await timelineManager.listTimelines();
+
+        if (timelines.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'No timelines found.\n\nCreate one with: create_timeline',
+              },
+            ],
+          };
+        }
+
+        const lines = ['EDITING TIMELINES', '='.repeat(80), ''];
+        for (const timeline of timelines) {
+          lines.push(`${timeline.name} (${timeline.id})`);
+          lines.push(`  Created: ${timeline.created.toLocaleString()}`);
+          lines.push(`  Modified: ${timeline.modified.toLocaleString()}`);
+          lines.push(`  Operations: ${timeline.operationCount}`);
+          lines.push(`  Position: ${timeline.currentIndex + 1}/${timeline.operationCount}`);
+          lines.push('');
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
+            },
+          ],
+        };
+      }
+
+      case 'get_timeline_stats': {
+        const timelineId = args.timelineId as string;
+
+        const stats = await timelineManager.getStatistics(timelineId);
+
+        const lines = [
+          'TIMELINE STATISTICS',
+          '='.repeat(80),
+          '',
+          `Total operations: ${stats.totalOperations}`,
+          `Completed: ${stats.completedOperations}`,
+          `Failed: ${stats.failedOperations}`,
+          '',
+          `Total duration: ${(stats.totalDuration / 1000).toFixed(2)}s`,
+          `Average duration: ${(stats.averageDuration / 1000).toFixed(2)}s`,
+          '',
+          'Operations by type:',
+        ];
+
+        for (const [type, count] of Object.entries(stats.operationsByType)) {
+          lines.push(`  ${type}: ${count}`);
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
             },
           ],
         };
