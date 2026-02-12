@@ -43,7 +43,7 @@ async function initialize() {
   await configManager.load();
   const config = configManager.get();
   videoOps = new VideoOperations(ffmpegManager, config);
-  transcriptOps = new TranscriptOperations(config.openaiApiKey);
+  transcriptOps = new TranscriptOperations(config.openaiApiKey, ffmpegManager);
 
   console.error(`FFmpeg initialized: ${ffmpegInfo.version} at ${ffmpegInfo.path}`);
   if (config.openaiApiKey) {
@@ -638,7 +638,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Reload operations with new config
         const config = configManager.get();
         videoOps = new VideoOperations(ffmpegManager, config);
-        transcriptOps = new TranscriptOperations(config.openaiApiKey);
+        transcriptOps = new TranscriptOperations(config.openaiApiKey, ffmpegManager);
         return {
           content: [
             {
@@ -653,7 +653,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await configManager.reset();
         const config = configManager.get();
         videoOps = new VideoOperations(ffmpegManager, config);
-        transcriptOps = new TranscriptOperations(config.openaiApiKey);
+        transcriptOps = new TranscriptOperations(config.openaiApiKey, ffmpegManager);
         return {
           content: [
             {

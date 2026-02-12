@@ -2,6 +2,9 @@ import OpenAI from 'openai';
 import fs from 'fs/promises';
 import path from 'path';
 import { createReadStream } from 'fs';
+import { FFmpegManager } from './ffmpeg-utils.js';
+import os from 'os';
+import { stat } from 'fs/promises';
 
 export interface TranscriptWord {
   word: string;
@@ -32,11 +35,99 @@ export interface TranscriptMatch {
 
 export class TranscriptOperations {
   private openai: OpenAI | null = null;
+  private ffmpegManager: FFmpegManager;
+  private readonly MAX_FILE_SIZE = 24 * 1024 * 1024; // 24MB (safe margin under 25MB limit)
+  private readonly CHUNK_DURATION = 600; // 10 minutes per chunk
 
-  constructor(apiKey?: string) {
+  constructor(apiKey?: string, ffmpegManager?: FFmpegManager) {
     if (apiKey) {
       this.openai = new OpenAI({ apiKey });
     }
+    this.ffmpegManager = ffmpegManager || new FFmpegManager();
+  }
+
+  /**
+   * Extract audio from video to a temporary file with optimized settings
+   */
+  private async extractAudioToFile(videoPath: string, outputPath: string): Promise<void> {
+    await this.ffmpegManager.initialize();
+
+    return new Promise((resolve, reject) => {
+      this.ffmpegManager
+        .createCommand(videoPath)
+        .audioCodec('libmp3lame')
+        .audioBitrate('64k') // Low bitrate to minimize file size
+        .audioChannels(1) // Mono to reduce size
+        .audioFrequency(16000) // 16kHz is optimal for Whisper
+        .noVideo()
+        .output(outputPath)
+        .on('end', () => resolve())
+        .on('error', (err) => reject(err))
+        .run();
+    });
+  }
+
+  /**
+   * Split audio file into chunks based on duration
+   */
+  private async splitAudioIntoChunks(
+    audioPath: string,
+    chunkDuration: number
+  ): Promise<string[]> {
+    await this.ffmpegManager.initialize();
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'whisper-chunks-'));
+    const chunkPaths: string[] = [];
+
+    return new Promise((resolve, reject) => {
+      this.ffmpegManager
+        .createCommand(audioPath)
+        .outputOptions([
+          '-f segment',
+          `-segment_time ${chunkDuration}`,
+          '-c copy',
+        ])
+        .output(path.join(tempDir, 'chunk_%03d.mp3'))
+        .on('end', async () => {
+          try {
+            const files = await fs.readdir(tempDir);
+            for (const file of files.sort()) {
+              chunkPaths.push(path.join(tempDir, file));
+            }
+            resolve(chunkPaths);
+          } catch (err) {
+            reject(err);
+          }
+        })
+        .on('error', (err) => reject(err))
+        .run();
+    });
+  }
+
+  /**
+   * Transcribe a single audio file
+   */
+  private async transcribeAudioFile(
+    audioPath: string,
+    options?: {
+      language?: string;
+      model?: 'whisper-1';
+    }
+  ): Promise<any> {
+    if (!this.openai) {
+      throw new Error('OpenAI API key not configured. Set OPENAI_API_KEY in config.');
+    }
+
+    const audioFile = createReadStream(audioPath);
+
+    const response = await this.openai.audio.transcriptions.create({
+      file: audioFile,
+      model: options?.model || 'whisper-1',
+      language: options?.language,
+      response_format: 'verbose_json',
+      timestamp_granularities: ['segment', 'word'],
+    });
+
+    return response;
   }
 
   async extractTranscript(
@@ -51,36 +142,101 @@ export class TranscriptOperations {
       throw new Error('OpenAI API key not configured. Set OPENAI_API_KEY in config.');
     }
 
-    const audioFile = createReadStream(videoPath);
+    // Create temporary directory for processing
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'whisper-'));
+    const audioPath = path.join(tempDir, 'audio.mp3');
 
-    const response = await this.openai.audio.transcriptions.create({
-      file: audioFile,
-      model: options?.model || 'whisper-1',
-      language: options?.language,
-      response_format: 'verbose_json',
-      timestamp_granularities: ['segment', 'word'],
-    });
+    try {
+      // Extract audio from video with optimized settings
+      console.log('Extracting audio from video...');
+      await this.extractAudioToFile(videoPath, audioPath);
 
-    // Parse the verbose JSON response
-    const data = response as any;
+      // Check if the audio file exceeds the size limit
+      const audioStats = await stat(audioPath);
+      const needsChunking = audioStats.size > this.MAX_FILE_SIZE;
 
-    const segments: TranscriptSegment[] = (data.segments || []).map((seg: any) => ({
-      text: seg.text,
-      start: seg.start,
-      end: seg.end,
-      words: seg.words?.map((w: any) => ({
-        word: w.word,
-        start: w.start,
-        end: w.end,
-      })),
-    }));
+      let allSegments: TranscriptSegment[] = [];
+      let fullText = '';
+      let language: string | undefined;
 
-    return {
-      text: data.text || '',
-      segments,
-      duration: segments.length > 0 ? segments[segments.length - 1].end : 0,
-      language: data.language,
-    };
+      if (needsChunking) {
+        console.log(`Audio file (${(audioStats.size / 1024 / 1024).toFixed(2)}MB) exceeds limit. Splitting into chunks...`);
+
+        // Split audio into chunks
+        const chunkPaths = await this.splitAudioIntoChunks(audioPath, this.CHUNK_DURATION);
+        console.log(`Split into ${chunkPaths.length} chunks. Processing...`);
+
+        let timeOffset = 0;
+
+        // Process each chunk
+        for (let i = 0; i < chunkPaths.length; i++) {
+          console.log(`Processing chunk ${i + 1}/${chunkPaths.length}...`);
+          const chunkPath = chunkPaths[i];
+
+          const response = await this.transcribeAudioFile(chunkPath, options);
+          const data = response as any;
+
+          // Adjust timestamps by adding offset
+          const segments: TranscriptSegment[] = (data.segments || []).map((seg: any) => ({
+            text: seg.text,
+            start: seg.start + timeOffset,
+            end: seg.end + timeOffset,
+            words: seg.words?.map((w: any) => ({
+              word: w.word,
+              start: w.start + timeOffset,
+              end: w.end + timeOffset,
+            })),
+          }));
+
+          allSegments.push(...segments);
+          fullText += (fullText ? ' ' : '') + (data.text || '');
+
+          if (!language && data.language) {
+            language = data.language;
+          }
+
+          // Update offset for next chunk
+          if (segments.length > 0) {
+            timeOffset = segments[segments.length - 1].end;
+          }
+
+          // Clean up chunk file
+          await fs.unlink(chunkPath).catch(() => {});
+        }
+
+        // Clean up chunk directory
+        await fs.rmdir(path.dirname(chunkPaths[0])).catch(() => {});
+      } else {
+        // File is small enough, process directly
+        console.log(`Audio file (${(audioStats.size / 1024 / 1024).toFixed(2)}MB) is within limit. Processing...`);
+        const response = await this.transcribeAudioFile(audioPath, options);
+        const data = response as any;
+
+        allSegments = (data.segments || []).map((seg: any) => ({
+          text: seg.text,
+          start: seg.start,
+          end: seg.end,
+          words: seg.words?.map((w: any) => ({
+            word: w.word,
+            start: w.start,
+            end: w.end,
+          })),
+        }));
+
+        fullText = data.text || '';
+        language = data.language;
+      }
+
+      return {
+        text: fullText,
+        segments: allSegments,
+        duration: allSegments.length > 0 ? allSegments[allSegments.length - 1].end : 0,
+        language,
+      };
+    } finally {
+      // Clean up temporary files
+      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   findTextInTranscript(transcript: Transcript, searchText: string): TranscriptMatch[] {
