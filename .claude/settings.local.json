@@ -15,7 +15,11 @@
       "Bash(find:*)",
       "Bash(node:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh:*)",
+      "Bash(gh auth:*)",
+      "mcp__video-editor__get_config"
     ]
   }
 }
