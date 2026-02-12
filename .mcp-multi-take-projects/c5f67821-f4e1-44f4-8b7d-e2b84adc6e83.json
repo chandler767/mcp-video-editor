@@ -1,0 +1,74 @@
+{
+  "projectId": "c5f67821-f4e1-44f4-8b7d-e2b84adc6e83",
+  "name": "Test Multi-Take",
+  "created": "2026-02-12T22:12:27.415Z",
+  "modified": "2026-02-12T22:12:27.418Z",
+  "script": {
+    "fullScript": "Welcome to this video tutorial.\n\nIn this first section, we'll cover the basics.\n\nNow let's move on to the advanced topics.\n\nThank you for watching!",
+    "sections": [
+      {
+        "id": "0714a25c-1000-4b8d-81fc-e318efcc420d",
+        "text": "Welcome to this video tutorial.",
+        "startLine": 0,
+        "endLine": 0,
+        "tags": []
+      },
+      {
+        "id": "b6d7f355-18a5-400b-9c66-57b5bdeb3ce1",
+        "text": "In this first section, we'll cover the basics.",
+        "startLine": 2,
+        "endLine": 2,
+        "tags": []
+      },
+      {
+        "id": "e60ad2e6-6baf-4e60-b16a-515ebfff354a",
+        "text": "Now let's move on to the advanced topics.",
+        "startLine": 4,
+        "endLine": 4,
+        "tags": []
+      },
+      {
+        "id": "66cea0a1-1dec-48e5-8864-a50e0856d04f",
+        "text": "Thank you for watching!",
+        "startLine": 6,
+        "endLine": 6,
+        "tags": []
+      }
+    ]
+  },
+  "takes": [],
+  "directories": {
+    "root": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/multi-take-project",
+    "source": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/multi-take-project/source",
+    "temp": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/multi-take-project/.temp",
+    "output": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/multi-take-project/output",
+    "exports": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/multi-take-project/exports",
+    "analysis": "/Users/chandler.mayo/Desktop/mcp-editor/build/test/output/multi-take-project/analysis"
+  },
+  "settings": {
+    "qualityThresholds": {
+      "minAudioClarity": 60,
+      "minVideoSharpness": 50,
+      "maxFillerWordRate": 10,
+      "minScriptCoverage": 0.8,
+      "minOverallScore": 60
+    },
+    "scriptMatching": {
+      "fuzzyMatch": true,
+      "matchThreshold": 0.8,
+      "ignoreCase": true,
+      "ignorePunctuation": true
+    },
+    "fileOrganization": {
+      "autoCleanTemp": true,
+      "tempFileMaxAge": 24,
+      "keepIntermediateFiles": false,
+      "outputFormat": "mp4"
+    }
+  },
+  "status": {
+    "phase": "setup",
+    "progress": 0,
+    "errors": []
+  }
+}

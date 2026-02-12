@@ -430,3 +430,32 @@ npx @modelcontextprotocol/inspector node build/index.js
 
 MIT
 
+
+## FFmpeg Requirements
+
+### Text Overlay Features
+
+The text overlay and subtitle burning features require FFmpeg compiled with **libfreetype** support.
+
+**Check if your FFmpeg supports text:**
+```bash
+ffmpeg -filters 2>&1 | grep drawtext
+```
+
+If drawtext is not listed, you need to install a full FFmpeg build:
+
+**macOS (Homebrew):**
+```bash
+brew install ffmpeg
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install ffmpeg
+```
+
+**Windows:**
+Download from [ffmpeg.org](https://ffmpeg.org/download.html) and ensure you get a build with libfreetype.
+
+The bundled FFmpeg may not include all filters. If text overlays don't work, install the full FFmpeg package.
+

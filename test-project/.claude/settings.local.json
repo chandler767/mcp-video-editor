@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "mcp__video-editor__extract_transcript",
-      "mcp__video-editor__set_config"
+      "mcp__video-editor__set_config",
+      "mcp__video-editor__get_video_info",
+      "mcp__video-editor__trim_video",
+      "mcp__video-editor__concatenate_videos"
     ]
   }
 }
