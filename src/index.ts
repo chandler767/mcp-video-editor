@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import path from 'path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -11,6 +12,10 @@ import { FFmpegManager } from './ffmpeg-utils.js';
 import { ConfigManager, VideoConfig } from './config.js';
 import { VideoOperations } from './video-operations.js';
 import { TranscriptOperations, Transcript } from './transcript-operations.js';
+import { MultiTakeProjectManager } from './multi-take/multi-take-manager.js';
+import { MultiTakeAnalyzer } from './multi-take/multi-take-analyzer.js';
+import { BestTakeSelector } from './multi-take/multi-take-selector.js';
+import { ReportGenerator } from './utils/report-generator.js';
 
 const server = new Server(
   {
@@ -28,6 +33,10 @@ const ffmpegManager = new FFmpegManager();
 const configManager = new ConfigManager();
 let videoOps: VideoOperations;
 let transcriptOps: TranscriptOperations;
+let multiTakeManager: MultiTakeProjectManager;
+let multiTakeAnalyzer: MultiTakeAnalyzer;
+let bestTakeSelector: BestTakeSelector;
+let reportGenerator: ReportGenerator;
 
 // Store transcripts in memory (could be extended to disk cache)
 const transcriptCache = new Map<string, Transcript>();
@@ -44,6 +53,10 @@ async function initialize() {
   const config = configManager.get();
   videoOps = new VideoOperations(ffmpegManager, config);
   transcriptOps = new TranscriptOperations(config.openaiApiKey, ffmpegManager);
+  multiTakeManager = new MultiTakeProjectManager(process.cwd());
+  multiTakeAnalyzer = new MultiTakeAnalyzer(config);
+  bestTakeSelector = new BestTakeSelector();
+  reportGenerator = new ReportGenerator();
 
   console.error(`FFmpeg initialized: ${ffmpegInfo.version} at ${ffmpegInfo.path}`);
   if (config.openaiApiKey) {
@@ -437,6 +450,183 @@ const tools: Tool[] = [
         },
       },
       required: ['input', 'output', 'script'],
+    },
+  },
+  {
+    name: 'create_multi_take_project',
+    description: 'Create a new multi-take project with a script. The system will analyze multiple takes of the same script and help you assemble the best take.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Project name',
+        },
+        script: {
+          type: 'string',
+          description: 'Full script text (will be automatically divided into sections by paragraph breaks)',
+        },
+        projectRoot: {
+          type: 'string',
+          description: 'Optional root directory for project (defaults to current directory + project name)',
+        },
+      },
+      required: ['name', 'script'],
+    },
+  },
+  {
+    name: 'add_takes_to_project',
+    description: 'Add video take files to a multi-take project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID from create_multi_take_project',
+        },
+        takeFiles: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of video file paths to add as takes',
+        },
+        move: {
+          type: 'boolean',
+          description: 'Move files instead of copying (default: false)',
+        },
+      },
+      required: ['projectId', 'takeFiles'],
+    },
+  },
+  {
+    name: 'analyze_takes',
+    description: 'Analyze all takes in a project for audio/video quality, script matching, and coverage. This runs transcript extraction, quality analysis, and issue detection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID',
+        },
+        parallel: {
+          type: 'boolean',
+          description: 'Run analysis in parallel for speed (default: true). Set to false for more stability.',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'get_project_analysis',
+    description: 'Get detailed analysis results for all takes in a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID',
+        },
+        format: {
+          type: 'string',
+          enum: ['summary', 'detailed', 'coverage', 'issues', 'json'],
+          description: 'Report format (default: summary)',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'select_best_takes',
+    description: 'Automatically select the best take for each script section based on quality scores',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'assemble_best_takes',
+    description: 'Extract and concatenate the best take segments to create the final video',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID',
+        },
+        outputPath: {
+          type: 'string',
+          description: 'Optional output path (defaults to project output directory)',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'export_final_video',
+    description: 'Export and transcode the final assembled video for web delivery',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID',
+        },
+        quality: {
+          type: 'string',
+          enum: ['high', 'medium', 'low'],
+          description: 'Export quality preset (default: medium)',
+        },
+        exportPath: {
+          type: 'string',
+          description: 'Optional export path (defaults to project exports directory)',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'get_project_issues',
+    description: 'List all issues detected across all takes in a project (quality problems, missing coverage, etc.)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'list_multi_take_projects',
+    description: 'List all multi-take projects',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'cleanup_project_temp',
+    description: 'Clean temporary files in a project workspace',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'Project ID',
+        },
+        force: {
+          type: 'boolean',
+          description: 'Force delete all temp files regardless of age (default: false)',
+        },
+      },
+      required: ['projectId'],
     },
   },
 ];
@@ -841,6 +1031,337 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Video trimmed to script successfully. Kept ${segmentsToKeep.length} segment(s). Output: ${result}`,
+            },
+          ],
+        };
+      }
+
+      case 'create_multi_take_project': {
+        const name = args.name as string;
+        const script = args.script as string;
+        const projectRoot = args.projectRoot as string | undefined;
+
+        const project = await multiTakeManager.createProject(name, script, projectRoot);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Multi-take project created successfully!\n\nProject ID: ${project.projectId}\nName: ${project.name}\nScript sections: ${project.script.sections.length}\nProject directory: ${project.directories.root}\n\nNext steps:\n1. Add video takes: add_takes_to_project\n2. Analyze takes: analyze_takes\n3. Select best takes: select_best_takes\n4. Assemble final video: assemble_best_takes`,
+            },
+          ],
+        };
+      }
+
+      case 'add_takes_to_project': {
+        const projectId = args.projectId as string;
+        const takeFiles = args.takeFiles as string[];
+        const move = (args.move as boolean) || false;
+
+        const project = await multiTakeManager.loadProject(projectId);
+        const result = await multiTakeManager.addTakes(project, takeFiles, move);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Takes added successfully!\n\nCopied: ${result.copied.length} file(s)\nFailed: ${result.failed.length} file(s)\nTotal size: ${(result.totalSize / 1024 / 1024).toFixed(2)} MB\n\n${result.failed.length > 0 ? `Failed files:\n${result.failed.map(f => `- ${f.path}: ${f.error}`).join('\n')}` : ''}`,
+            },
+          ],
+        };
+      }
+
+      case 'analyze_takes': {
+        const projectId = args.projectId as string;
+        const parallel = args.parallel !== undefined ? (args.parallel as boolean) : true;
+
+        if (!configManager.get().openaiApiKey) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Error: OpenAI API key not configured. Transcript analysis requires OpenAI API access. Set openaiApiKey in config.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const project = await multiTakeManager.loadProject(projectId);
+        await multiTakeManager.updateStatus(project, 'analyzing', 0, 'Starting analysis...');
+
+        const takeFiles = await multiTakeManager.getTakeFiles(project);
+
+        const analyses = await multiTakeAnalyzer.analyzeAllTakes(
+          project,
+          takeFiles,
+          parallel,
+          (progress, current) => {
+            console.error(`Analysis progress: ${Math.round(progress)}% - ${current}`);
+          }
+        );
+
+        // Save analyses to project
+        project.takes = analyses;
+        await multiTakeManager.updateStatus(project, 'selecting', 100, 'Analysis complete');
+        await multiTakeManager.saveProject(project);
+
+        const stats = await multiTakeManager.getProjectStats(project);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Analysis complete!\n\nTakes analyzed: ${stats.takes.analyzed}/${stats.takes.total}\nAverage quality: ${stats.quality.averageScore}/100\nScript coverage: ${stats.coverage.coveredSections}/${stats.coverage.totalSections} sections\nIssues found: ${stats.quality.errors} error(s), ${stats.quality.warnings} warning(s)\n\nUse get_project_analysis to view detailed results.`,
+            },
+          ],
+        };
+      }
+
+      case 'get_project_analysis': {
+        const projectId = args.projectId as string;
+        const format = (args.format as string) || 'summary';
+
+        const project = await multiTakeManager.loadProject(projectId);
+
+        let report: string;
+        switch (format) {
+          case 'detailed':
+            report = reportGenerator.generateAnalysisReport(project);
+            break;
+          case 'coverage':
+            report = reportGenerator.generateCoverageReport(project);
+            break;
+          case 'issues':
+            report = reportGenerator.generateIssuesReport(project);
+            break;
+          case 'json':
+            report = reportGenerator.generateJSONReport(project);
+            break;
+          case 'summary':
+          default:
+            report = reportGenerator.generateProjectOverview(project);
+            break;
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: report,
+            },
+          ],
+        };
+      }
+
+      case 'select_best_takes': {
+        const projectId = args.projectId as string;
+
+        const project = await multiTakeManager.loadProject(projectId);
+
+        const validation = multiTakeManager.validateReadyForAnalysis(project);
+        if (!validation.valid) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Error: ${validation.error}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const selections = bestTakeSelector.selectBestTakes(project);
+        const plan = bestTakeSelector.createAssemblyPlan(project, selections);
+
+        const planValidation = bestTakeSelector.validateAssemblyPlan(plan);
+        if (!planValidation.valid) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Warning: ${planValidation.error}\n\n${reportGenerator.generateAssemblyReport(project, plan)}`,
+              },
+            ],
+          };
+        }
+
+        project.bestTakes = selections;
+        await multiTakeManager.saveProject(project);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: reportGenerator.generateAssemblyReport(project, plan),
+            },
+          ],
+        };
+      }
+
+      case 'assemble_best_takes': {
+        const projectId = args.projectId as string;
+        const outputPath = args.outputPath as string | undefined;
+
+        const project = await multiTakeManager.loadProject(projectId);
+
+        const validation = multiTakeManager.validateReadyForAssembly(project);
+        if (!validation.valid) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Error: ${validation.error}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Extract segments from best takes
+        const segments: string[] = [];
+        for (const selection of project.bestTakes!) {
+          if (!selection.takeId || !selection.segment) {
+            continue; // Skip sections without coverage
+          }
+
+          const segmentPath = path.join(
+            project.directories.temp,
+            `segment_${selection.sectionId}.mp4`
+          );
+
+          await videoOps.trim({
+            input: selection.filePath!,
+            output: segmentPath,
+            startTime: selection.segment.start,
+            endTime: selection.segment.end,
+          });
+
+          segments.push(segmentPath);
+        }
+
+        // Concatenate segments
+        const finalOutput = outputPath || path.join(
+          project.directories.output,
+          `${project.name}_assembled.mp4`
+        );
+
+        await videoOps.concatenate({
+          inputs: segments,
+          output: finalOutput,
+        });
+
+        await multiTakeManager.updateStatus(project, 'complete', 100, 'Assembly complete');
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Video assembled successfully!\n\nOutput: ${finalOutput}\nSegments: ${segments.length}\n\nUse export_final_video to transcode for web delivery.`,
+            },
+          ],
+        };
+      }
+
+      case 'export_final_video': {
+        const projectId = args.projectId as string;
+        const quality = (args.quality as 'high' | 'medium' | 'low') || 'medium';
+        const exportPath = args.exportPath as string | undefined;
+
+        const project = await multiTakeManager.loadProject(projectId);
+
+        // Find assembled video
+        const assembledPath = path.join(
+          project.directories.output,
+          `${project.name}_assembled.mp4`
+        );
+
+        const finalExportPath = exportPath || path.join(
+          project.directories.exports,
+          `${project.name}_final.mp4`
+        );
+
+        await videoOps.transcodeForWeb({
+          input: assembledPath,
+          output: finalExportPath,
+          quality,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Video exported successfully!\n\nOutput: ${finalExportPath}\nQuality: ${quality}`,
+            },
+          ],
+        };
+      }
+
+      case 'get_project_issues': {
+        const projectId = args.projectId as string;
+
+        const project = await multiTakeManager.loadProject(projectId);
+        const report = reportGenerator.generateIssuesReport(project);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: report,
+            },
+          ],
+        };
+      }
+
+      case 'list_multi_take_projects': {
+        const projects = await multiTakeManager.listProjects();
+
+        if (projects.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'No multi-take projects found.\n\nCreate one with: create_multi_take_project',
+              },
+            ],
+          };
+        }
+
+        const lines = ['MULTI-TAKE PROJECTS', '='.repeat(80), ''];
+        for (const project of projects) {
+          lines.push(`${project.name} (${project.projectId})`);
+          lines.push(`  Created: ${project.created.toLocaleString()}`);
+          lines.push(`  Modified: ${project.modified.toLocaleString()}`);
+          lines.push(`  Status: ${project.status.phase} (${project.status.progress}%)`);
+          lines.push(`  Takes: ${project.takeCount}`);
+          lines.push('');
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
+            },
+          ],
+        };
+      }
+
+      case 'cleanup_project_temp': {
+        const projectId = args.projectId as string;
+        const force = (args.force as boolean) || false;
+
+        const project = await multiTakeManager.loadProject(projectId);
+        const result = await multiTakeManager.cleanTempFiles(project, force);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: result.cleaned
+                ? `Temporary files cleaned!\n\nDeleted: ${result.deletedCount} file(s)\nFreed space: ${((result.freedSpace || 0) / 1024 / 1024).toFixed(2)} MB`
+                : `Cleanup skipped: ${result.reason}`,
             },
           ],
         };
