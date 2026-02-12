@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm run build)",
+      "Bash(chmod:*)",
+      "Bash(npm run test:generate:*)",
+      "Bash(brew list:*)",
+      "Bash(brew install:*)",
+      "Bash(npm run test:run:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(ffprobe:*)",
+      "Bash(npm run test:transcript:*)",
+      "Bash(npm run test:all:*)",
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

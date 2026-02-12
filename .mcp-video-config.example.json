@@ -1,0 +1,10 @@
+{
+  "defaultOutputFormat": "mp4",
+  "defaultQuality": "23",
+  "defaultCodec": "libx264",
+  "defaultAudioCodec": "aac",
+  "defaultAudioBitrate": "192k",
+  "defaultVideoBitrate": null,
+  "defaultPreset": "medium",
+  "workingDirectory": "/path/to/your/project"
+}

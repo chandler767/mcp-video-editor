@@ -1,0 +1,57 @@
+# Node modules
+node_modules/
+
+# Build output
+build/
+dist/
+
+# Test output and videos
+test-videos/
+test/videos/
+test/output/
+
+# Config files with sensitive data
+.mcp-video-config.json
+
+# Video and media files (test files only - not source examples)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.png
+*.jpg
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+temp/
+tmp/

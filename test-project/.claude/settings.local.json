@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__video-editor__extract_transcript",
+      "mcp__video-editor__set_config"
+    ]
+  }
+}
