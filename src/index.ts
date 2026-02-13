@@ -19,6 +19,12 @@ import { ReportGenerator } from './utils/report-generator.js';
 import { TextOperations } from './text-operations.js';
 import { TimelineManager } from './timeline-manager.js';
 import { VideoVisionAnalyzer } from './video-vision-analyzer.js';
+import { VisualElements } from './visual-elements.js';
+import { AnimationEngine } from './animation-engine.js';
+import { TransitionEffects } from './transition-effects.js';
+import { DiagramGenerator } from './diagram-generator.js';
+import { CompositeOperations } from './composite-operations.js';
+import { VisualEffects } from './visual-effects.js';
 
 const server = new Server(
   {
@@ -43,6 +49,12 @@ let multiTakeAnalyzer: MultiTakeAnalyzer;
 let bestTakeSelector: BestTakeSelector;
 let reportGenerator: ReportGenerator;
 let visionAnalyzer: VideoVisionAnalyzer;
+let visualElements: VisualElements;
+let animationEngine: AnimationEngine;
+let transitionEffects: TransitionEffects;
+let diagramGenerator: DiagramGenerator;
+let compositeOps: CompositeOperations;
+let visualEffects: VisualEffects;
 
 // Store transcripts in memory (could be extended to disk cache)
 const transcriptCache = new Map<string, Transcript>();
@@ -66,6 +78,12 @@ async function initialize() {
   bestTakeSelector = new BestTakeSelector();
   reportGenerator = new ReportGenerator();
   visionAnalyzer = new VideoVisionAnalyzer(config.openaiApiKey, ffmpegManager, config);
+  visualElements = new VisualElements(ffmpegManager);
+  animationEngine = new AnimationEngine(ffmpegManager);
+  transitionEffects = new TransitionEffects(ffmpegManager);
+  diagramGenerator = new DiagramGenerator(ffmpegManager);
+  compositeOps = new CompositeOperations(ffmpegManager);
+  visualEffects = new VisualEffects(ffmpegManager);
 
   console.error(`FFmpeg initialized: ${ffmpegInfo.version} at ${ffmpegInfo.path}`);
   if (config.openaiApiKey) {
@@ -1119,6 +1137,253 @@ const tools: Tool[] = [
         },
       },
       required: ['input', 'timestamp1', 'timestamp2'],
+    },
+  },
+  // Visual Effects & Animation Tools
+  {
+    name: 'add_image_overlay',
+    description: 'Overlay an image on video with positioning, scaling, rotation, and opacity control',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input video path' },
+        image: { type: 'string', description: 'Image path to overlay' },
+        output: { type: 'string', description: 'Output video path' },
+        x: { type: 'number', description: 'X position (optional)' },
+        y: { type: 'number', description: 'Y position (optional)' },
+        anchor: { type: 'string', description: 'Anchor point: top-left, center, bottom-right, etc (optional)' },
+        width: { type: 'number', description: 'Image width (optional)' },
+        height: { type: 'number', description: 'Image height (optional)' },
+        rotation: { type: 'number', description: 'Rotation in degrees (optional)' },
+        opacity: { type: 'number', description: 'Opacity 0-1 (optional)' },
+        startTime: { type: 'number', description: 'Start time in seconds (optional)' },
+        duration: { type: 'number', description: 'Duration in seconds (optional)' },
+      },
+      required: ['input', 'image', 'output'],
+    },
+  },
+  {
+    name: 'add_shape',
+    description: 'Draw shapes (rectangle, circle, line, arrow, polygon) on video',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input video path' },
+        output: { type: 'string', description: 'Output video path' },
+        type: { type: 'string', description: 'Shape type: rectangle, circle, line, arrow, polygon' },
+        x: { type: 'number', description: 'X position' },
+        y: { type: 'number', description: 'Y position' },
+        width: { type: 'number', description: 'Width' },
+        height: { type: 'number', description: 'Height' },
+        color: { type: 'string', description: 'Color (hex or name)' },
+        thickness: { type: 'number', description: 'Line thickness (optional)' },
+        filled: { type: 'boolean', description: 'Fill shape (optional)' },
+        opacity: { type: 'number', description: 'Opacity 0-1 (optional)' },
+      },
+      required: ['input', 'output', 'type', 'x', 'y', 'width', 'height', 'color'],
+    },
+  },
+  {
+    name: 'add_transition',
+    description: 'Add transition effect between two video clips',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input1: { type: 'string', description: 'First video path' },
+        input2: { type: 'string', description: 'Second video path' },
+        output: { type: 'string', description: 'Output video path' },
+        type: { type: 'string', description: 'Transition type: fade, wipeleft, wiperight, slideup, slidedown, etc' },
+        duration: { type: 'number', description: 'Transition duration in seconds (default: 1)' },
+        offset: { type: 'number', description: 'When to start transition (optional)' },
+      },
+      required: ['input1', 'input2', 'output', 'type'],
+    },
+  },
+  {
+    name: 'crossfade_videos',
+    description: 'Smoothly crossfade between two videos',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input1: { type: 'string', description: 'First video path' },
+        input2: { type: 'string', description: 'Second video path' },
+        output: { type: 'string', description: 'Output video path' },
+        duration: { type: 'number', description: 'Crossfade duration in seconds (default: 1)' },
+      },
+      required: ['input1', 'input2', 'output'],
+    },
+  },
+  {
+    name: 'create_picture_in_picture',
+    description: 'Create picture-in-picture effect with main video and smaller overlay video',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mainVideo: { type: 'string', description: 'Main video path' },
+        pipVideo: { type: 'string', description: 'Picture-in-picture video path' },
+        output: { type: 'string', description: 'Output video path' },
+        position: { type: 'string', description: 'PiP position: bottom-right, top-left, center, etc (default: bottom-right)' },
+        width: { type: 'number', description: 'PiP width (optional)' },
+        height: { type: 'number', description: 'PiP height (optional)' },
+        margin: { type: 'number', description: 'Margin from edge in pixels (default: 20)' },
+        borderWidth: { type: 'number', description: 'Border width (optional)' },
+        borderColor: { type: 'string', description: 'Border color (optional)' },
+      },
+      required: ['mainVideo', 'pipVideo', 'output'],
+    },
+  },
+  {
+    name: 'create_split_screen',
+    description: 'Create split screen layout with multiple videos',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        videos: { type: 'array', items: { type: 'string' }, description: 'Array of video paths' },
+        output: { type: 'string', description: 'Output video path' },
+        layout: { type: 'string', description: 'Layout: horizontal, vertical, grid-2x2, grid-3x3, etc' },
+        borderWidth: { type: 'number', description: 'Border width (optional)' },
+        borderColor: { type: 'string', description: 'Border color (optional)' },
+      },
+      required: ['videos', 'output', 'layout'],
+    },
+  },
+  {
+    name: 'apply_blur_effect',
+    description: 'Apply blur effect to video (gaussian, box, motion, radial)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input video path' },
+        output: { type: 'string', description: 'Output video path' },
+        type: { type: 'string', description: 'Blur type: gaussian, box, motion, radial (default: gaussian)' },
+        strength: { type: 'number', description: 'Blur strength 0-10 (default: 5)' },
+        angle: { type: 'number', description: 'For motion blur: angle in degrees (optional)' },
+        startTime: { type: 'number', description: 'Start time in seconds (optional)' },
+        duration: { type: 'number', description: 'Effect duration in seconds (optional)' },
+      },
+      required: ['input', 'output'],
+    },
+  },
+  {
+    name: 'apply_color_grade',
+    description: 'Apply color grading adjustments (brightness, contrast, saturation, temperature)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input video path' },
+        output: { type: 'string', description: 'Output video path' },
+        brightness: { type: 'number', description: 'Brightness adjustment -1 to 1 (optional)' },
+        contrast: { type: 'number', description: 'Contrast adjustment -1 to 1 (optional)' },
+        saturation: { type: 'number', description: 'Saturation adjustment -1 to 1 (optional)' },
+        gamma: { type: 'number', description: 'Gamma 0.1 to 10 (optional)' },
+        hue: { type: 'number', description: 'Hue rotation in degrees (optional)' },
+        temperature: { type: 'number', description: 'Temperature -100 to 100 (optional)' },
+        tint: { type: 'number', description: 'Tint -100 to 100 (optional)' },
+      },
+      required: ['input', 'output'],
+    },
+  },
+  {
+    name: 'apply_chroma_key',
+    description: 'Remove green screen (chroma key) and optionally add background',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input video path' },
+        output: { type: 'string', description: 'Output video path' },
+        keyColor: { type: 'string', description: 'Color to key out (default: green)' },
+        similarity: { type: 'number', description: 'Color similarity threshold 0-1 (default: 0.3)' },
+        blend: { type: 'number', description: 'Edge blend 0-1 (default: 0.1)' },
+        backgroundImage: { type: 'string', description: 'Background image path (optional)' },
+        backgroundColor: { type: 'string', description: 'Background color (optional)' },
+      },
+      required: ['input', 'output'],
+    },
+  },
+  {
+    name: 'apply_ken_burns',
+    description: 'Apply Ken Burns effect (zoom and pan) to still image',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input image path' },
+        output: { type: 'string', description: 'Output video path' },
+        duration: { type: 'number', description: 'Video duration in seconds' },
+        startZoom: { type: 'number', description: 'Starting zoom level (default: 1)' },
+        endZoom: { type: 'number', description: 'Ending zoom level (default: 1.2)' },
+        startX: { type: 'number', description: 'Starting X position (optional)' },
+        startY: { type: 'number', description: 'Starting Y position (optional)' },
+        endX: { type: 'number', description: 'Ending X position (optional)' },
+        endY: { type: 'number', description: 'Ending Y position (optional)' },
+        fps: { type: 'number', description: 'Output FPS (default: 30)' },
+      },
+      required: ['input', 'output', 'duration'],
+    },
+  },
+  {
+    name: 'generate_flowchart',
+    description: 'Generate flowchart diagram from data',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: { type: 'string', description: 'Output SVG file path' },
+        nodes: { type: 'array', description: 'Array of nodes with id, label, type' },
+        edges: { type: 'array', description: 'Array of edges with from, to, label' },
+        layout: { type: 'string', description: 'Layout: vertical or horizontal (default: vertical)' },
+      },
+      required: ['output', 'nodes', 'edges'],
+    },
+  },
+  {
+    name: 'generate_timeline',
+    description: 'Generate timeline diagram',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: { type: 'string', description: 'Output SVG file path' },
+        events: { type: 'array', description: 'Array of events with id, label, date' },
+        orientation: { type: 'string', description: 'Orientation: horizontal or vertical (default: horizontal)' },
+        showDates: { type: 'boolean', description: 'Show dates (default: true)' },
+      },
+      required: ['output', 'events'],
+    },
+  },
+  {
+    name: 'generate_org_chart',
+    description: 'Generate organization chart diagram',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: { type: 'string', description: 'Output SVG file path' },
+        nodes: { type: 'array', description: 'Array of nodes with id, name, title, parentId' },
+      },
+      required: ['output', 'nodes'],
+    },
+  },
+  {
+    name: 'apply_vignette',
+    description: 'Apply vignette effect (darkened edges)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input video path' },
+        output: { type: 'string', description: 'Output video path' },
+        intensity: { type: 'number', description: 'Vignette intensity 0-1 (default: 0.5)' },
+      },
+      required: ['input', 'output'],
+    },
+  },
+  {
+    name: 'apply_sharpen',
+    description: 'Apply sharpen effect to video',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Input video path' },
+        output: { type: 'string', description: 'Output video path' },
+        strength: { type: 'number', description: 'Sharpen strength 0-10 (default: 5)' },
+      },
+      required: ['input', 'output'],
     },
   },
 ];
@@ -2427,6 +2692,200 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             },
           ],
         };
+      }
+
+      case 'add_image_overlay': {
+        const options = {
+          input: args.input as string,
+          image: args.image as string,
+          output: args.output as string,
+          position: args.x !== undefined && args.y !== undefined ? { x: args.x as number, y: args.y as number } : undefined,
+          anchor: args.anchor as any,
+          size: args.width !== undefined && args.height !== undefined ? { width: args.width as number, height: args.height as number } : undefined,
+          rotation: args.rotation as number | undefined,
+          opacity: args.opacity as number | undefined,
+          startTime: args.startTime as number | undefined,
+          duration: args.duration as number | undefined,
+        };
+        const result = await visualElements.addImageOverlay(options);
+        return { content: [{ type: 'text', text: `Image overlay added successfully: ${result}` }] };
+      }
+
+      case 'add_shape': {
+        const options = {
+          input: args.input as string,
+          output: args.output as string,
+          type: args.type as any,
+          position: { x: args.x as number, y: args.y as number },
+          size: { width: args.width as number, height: args.height as number },
+          color: args.color as string,
+          thickness: args.thickness as number | undefined,
+          filled: args.filled as boolean | undefined,
+          opacity: args.opacity as number | undefined,
+        };
+        const result = await visualElements.addShape(options);
+        return { content: [{ type: 'text', text: `Shape added successfully: ${result}` }] };
+      }
+
+      case 'add_transition': {
+        const options = {
+          input1: args.input1 as string,
+          input2: args.input2 as string,
+          output: args.output as string,
+          type: args.type as any,
+          duration: args.duration as number | undefined,
+          offset: args.offset as number | undefined,
+        };
+        const result = await transitionEffects.addTransition(options);
+        return { content: [{ type: 'text', text: `Transition added successfully: ${result}` }] };
+      }
+
+      case 'crossfade_videos': {
+        const options = {
+          input1: args.input1 as string,
+          input2: args.input2 as string,
+          output: args.output as string,
+          duration: args.duration as number | undefined,
+        };
+        const result = await transitionEffects.crossfade(options);
+        return { content: [{ type: 'text', text: `Crossfade applied successfully: ${result}` }] };
+      }
+
+      case 'create_picture_in_picture': {
+        const options = {
+          mainVideo: args.mainVideo as string,
+          pipVideo: args.pipVideo as string,
+          output: args.output as string,
+          position: args.position as any,
+          size: args.width !== undefined && args.height !== undefined ? { width: args.width as number, height: args.height as number } : undefined,
+          margin: args.margin as number | undefined,
+          borderWidth: args.borderWidth as number | undefined,
+          borderColor: args.borderColor as string | undefined,
+        };
+        const result = await compositeOps.createPictureInPicture(options);
+        return { content: [{ type: 'text', text: `Picture-in-picture created successfully: ${result}` }] };
+      }
+
+      case 'create_split_screen': {
+        const options = {
+          videos: args.videos as string[],
+          output: args.output as string,
+          layout: args.layout as any,
+          borderWidth: args.borderWidth as number | undefined,
+          borderColor: args.borderColor as string | undefined,
+        };
+        const result = await compositeOps.createSplitScreen(options);
+        return { content: [{ type: 'text', text: `Split screen created successfully: ${result}` }] };
+      }
+
+      case 'apply_blur_effect': {
+        const options = {
+          input: args.input as string,
+          output: args.output as string,
+          type: args.type as any,
+          strength: args.strength as number | undefined,
+          angle: args.angle as number | undefined,
+          startTime: args.startTime as number | undefined,
+          duration: args.duration as number | undefined,
+        };
+        const result = await visualEffects.applyBlur(options);
+        return { content: [{ type: 'text', text: `Blur effect applied successfully: ${result}` }] };
+      }
+
+      case 'apply_color_grade': {
+        const options = {
+          input: args.input as string,
+          output: args.output as string,
+          brightness: args.brightness as number | undefined,
+          contrast: args.contrast as number | undefined,
+          saturation: args.saturation as number | undefined,
+          gamma: args.gamma as number | undefined,
+          hue: args.hue as number | undefined,
+          temperature: args.temperature as number | undefined,
+          tint: args.tint as number | undefined,
+        };
+        const result = await visualEffects.applyColorGrade(options);
+        return { content: [{ type: 'text', text: `Color grading applied successfully: ${result}` }] };
+      }
+
+      case 'apply_chroma_key': {
+        const options = {
+          input: args.input as string,
+          output: args.output as string,
+          keyColor: args.keyColor as string | undefined,
+          similarity: args.similarity as number | undefined,
+          blend: args.blend as number | undefined,
+          backgroundImage: args.backgroundImage as string | undefined,
+          backgroundColor: args.backgroundColor as string | undefined,
+        };
+        const result = await visualEffects.applyChromaKey(options);
+        return { content: [{ type: 'text', text: `Chroma key applied successfully: ${result}` }] };
+      }
+
+      case 'apply_ken_burns': {
+        const options = {
+          input: args.input as string,
+          output: args.output as string,
+          duration: args.duration as number,
+          startZoom: args.startZoom as number | undefined,
+          endZoom: args.endZoom as number | undefined,
+          startPosition: args.startX !== undefined && args.startY !== undefined ? { x: args.startX as number, y: args.startY as number } : undefined,
+          endPosition: args.endX !== undefined && args.endY !== undefined ? { x: args.endX as number, y: args.endY as number } : undefined,
+          fps: args.fps as number | undefined,
+        };
+        const result = await visualEffects.applyKenBurns(options);
+        return { content: [{ type: 'text', text: `Ken Burns effect applied successfully: ${result}` }] };
+      }
+
+      case 'generate_flowchart': {
+        const options = {
+          output: args.output as string,
+          nodes: args.nodes as any[],
+          edges: args.edges as any[],
+          layout: args.layout as any,
+        };
+        const result = await diagramGenerator.generateFlowchart(options);
+        return { content: [{ type: 'text', text: `Flowchart generated successfully: ${result}` }] };
+      }
+
+      case 'generate_timeline': {
+        const options = {
+          output: args.output as string,
+          events: args.events as any[],
+          orientation: args.orientation as any,
+          showDates: args.showDates as boolean | undefined,
+        };
+        const result = await diagramGenerator.generateTimeline(options);
+        return { content: [{ type: 'text', text: `Timeline generated successfully: ${result}` }] };
+      }
+
+      case 'generate_org_chart': {
+        const options = {
+          output: args.output as string,
+          nodes: args.nodes as any[],
+        };
+        const result = await diagramGenerator.generateOrgChart(options);
+        return { content: [{ type: 'text', text: `Organization chart generated successfully: ${result}` }] };
+      }
+
+      case 'apply_vignette': {
+        const options = {
+          input: args.input as string,
+          output: args.output as string,
+          intensity: args.intensity as number | undefined,
+        };
+        const result = await visualEffects.applyVignette(options);
+        return { content: [{ type: 'text', text: `Vignette applied successfully: ${result}` }] };
+      }
+
+      case 'apply_sharpen': {
+        const options = {
+          input: args.input as string,
+          output: args.output as string,
+          strength: args.strength as number | undefined,
+        };
+        const result = await visualEffects.applySharpen(options);
+        return { content: [{ type: 'text', text: `Sharpen effect applied successfully: ${result}` }] };
       }
 
       default:
