@@ -55,3 +55,4 @@ Thumbs.db
 *.tmp
 temp/
 tmp/
+.mcp-video-vision-temp/

@@ -14,8 +14,9 @@
     "test:run": "node build/test/test-mcp-client.js",
     "test:transcript": "node build/test/test-transcript.js",
     "test:new": "node build/test/test-new-features.js",
+    "test:vision": "node build/test/test-vision.js",
     "test": "npm run test:generate && npm run test:run",
-    "test:all": "npm run test:generate && npm run test:run && npm run test:transcript && npm run test:new",
+    "test:all": "npm run test:generate && npm run test:run && npm run test:transcript && npm run test:new && npm run test:vision",
     "inspector": "npx @modelcontextprotocol/inspector node build/index.js"
   },
   "keywords": ["mcp", "video", "editing", "ffmpeg"],

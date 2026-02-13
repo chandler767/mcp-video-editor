@@ -21,13 +21,29 @@ A Model Context Protocol (MCP) server for video editing operations using FFmpeg.
 - **Automatic overwrite detection** - Prevents accidentally using the same path for input and output
 - **Quality matching** - Output videos automatically match input quality and format by default
 
-### 🎙️ NEW: Transcript-Based Editing
+### 🎙️ Transcript-Based Editing
 - **Extract Transcript** - Get word-level transcripts with timestamps using Whisper
 - **Find in Transcript** - Search for specific text and get timestamps
 - **Remove by Transcript** - Remove parts where specific text is spoken (e.g., filler words)
 - **Trim to Script** - Keep only parts matching a provided script
 
 See [TRANSCRIPT_FEATURES.md](TRANSCRIPT_FEATURES.md) for details.
+
+### 👁️ NEW: Vision Analysis (GPT-4 Vision)
+- **Analyze Video Content** - Get frame-by-frame descriptions and video summary
+- **Search Visual Content** - Find specific objects, people, scenes, or text in video
+- **Describe Scene** - Get detailed description of what's happening at any timestamp
+- **Find Objects** - Track when specific things appear throughout the video
+- **Compare Frames** - Detect what changed between two moments
+
+**Use cases:**
+- "Find all frames showing the product logo"
+- "Hide the laptop screen behind text" (find object → overlay text)
+- "Remove clips showing a specific person" (search → extract inverse segments)
+- Generate automatic video descriptions and summaries
+- Content moderation and verification
+
+See [VISION.md](VISION.md) for detailed examples and usage guide.
 
 ## Installation
 

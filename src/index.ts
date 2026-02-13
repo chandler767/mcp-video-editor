@@ -18,6 +18,7 @@ import { BestTakeSelector } from './multi-take/multi-take-selector.js';
 import { ReportGenerator } from './utils/report-generator.js';
 import { TextOperations } from './text-operations.js';
 import { TimelineManager } from './timeline-manager.js';
+import { VideoVisionAnalyzer } from './video-vision-analyzer.js';
 
 const server = new Server(
   {
@@ -41,6 +42,7 @@ let multiTakeManager: MultiTakeProjectManager;
 let multiTakeAnalyzer: MultiTakeAnalyzer;
 let bestTakeSelector: BestTakeSelector;
 let reportGenerator: ReportGenerator;
+let visionAnalyzer: VideoVisionAnalyzer;
 
 // Store transcripts in memory (could be extended to disk cache)
 const transcriptCache = new Map<string, Transcript>();
@@ -63,6 +65,7 @@ async function initialize() {
   multiTakeAnalyzer = new MultiTakeAnalyzer(config);
   bestTakeSelector = new BestTakeSelector();
   reportGenerator = new ReportGenerator();
+  visionAnalyzer = new VideoVisionAnalyzer(config.openaiApiKey, ffmpegManager, config);
 
   console.error(`FFmpeg initialized: ${ffmpegInfo.version} at ${ffmpegInfo.path}`);
   if (config.openaiApiKey) {
@@ -1000,6 +1003,122 @@ const tools: Tool[] = [
         },
       },
       required: ['timelineId'],
+    },
+  },
+  {
+    name: 'analyze_video_content',
+    description: 'Analyze visual content of video by extracting and analyzing frames with GPT-4 Vision. Returns frame descriptions, objects detected, and overall summary.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        interval: {
+          type: 'number',
+          description: 'Interval in seconds between frame extractions (default: 5)',
+        },
+        count: {
+          type: 'number',
+          description: 'Number of evenly-spaced frames to analyze (alternative to interval)',
+        },
+        timestamps: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Specific timestamps in seconds to analyze (alternative to interval/count)',
+        },
+      },
+      required: ['input'],
+    },
+  },
+  {
+    name: 'search_visual_content',
+    description: 'Search for specific visual content in video (objects, people, scenes, text, etc.). Returns timestamps where the content appears.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        query: {
+          type: 'string',
+          description: 'What to search for (e.g., "person wearing red shirt", "laptop on desk", "text saying hello")',
+        },
+        interval: {
+          type: 'number',
+          description: 'Interval in seconds between frame checks (default: 5). Smaller = more accurate but slower',
+        },
+      },
+      required: ['input', 'query'],
+    },
+  },
+  {
+    name: 'describe_scene',
+    description: 'Get detailed description of what\'s happening at a specific moment in the video',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        timestamp: {
+          type: 'number',
+          description: 'Timestamp in seconds to describe',
+        },
+        detailLevel: {
+          type: 'string',
+          enum: ['brief', 'detailed', 'comprehensive'],
+          description: 'Level of detail in description (default: detailed)',
+        },
+      },
+      required: ['input', 'timestamp'],
+    },
+  },
+  {
+    name: 'find_objects_in_video',
+    description: 'Track when specific objects, people, or things appear in the video. Returns time ranges of appearances.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        targetDescription: {
+          type: 'string',
+          description: 'Description of what to find (e.g., "person", "car", "logo")',
+        },
+        interval: {
+          type: 'number',
+          description: 'Check interval in seconds (default: 2). Smaller = more accurate tracking',
+        },
+      },
+      required: ['input', 'targetDescription'],
+    },
+  },
+  {
+    name: 'compare_video_frames',
+    description: 'Compare two moments in a video to detect what changed between them',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Input video file path',
+        },
+        timestamp1: {
+          type: 'number',
+          description: 'First timestamp in seconds',
+        },
+        timestamp2: {
+          type: 'number',
+          description: 'Second timestamp in seconds',
+        },
+      },
+      required: ['input', 'timestamp1', 'timestamp2'],
     },
   },
 ];
@@ -2026,6 +2145,279 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         for (const [type, count] of Object.entries(stats.operationsByType)) {
           lines.push(`  ${type}: ${count}`);
         }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
+            },
+          ],
+        };
+      }
+
+      case 'analyze_video_content': {
+        if (!configManager.get().openaiApiKey) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Vision analysis requires OpenAI API key. Set openaiApiKey in config.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const input = args.input as string;
+        const interval = args.interval as number | undefined;
+        const count = args.count as number | undefined;
+        const timestamps = args.timestamps as number[] | undefined;
+
+        const analysis = await visionAnalyzer.analyzeVideo(input, {
+          interval,
+          count,
+          timestamps,
+        });
+
+        const lines = [
+          'VIDEO CONTENT ANALYSIS',
+          '='.repeat(80),
+          '',
+          `Video: ${analysis.videoPath}`,
+          `Duration: ${analysis.duration.toFixed(1)}s`,
+          `Frames analyzed: ${analysis.frames.length}`,
+          '',
+          'SUMMARY',
+          '-'.repeat(80),
+          analysis.summary,
+          '',
+          'FRAME DESCRIPTIONS',
+          '-'.repeat(80),
+        ];
+
+        for (const frame of analysis.frames) {
+          lines.push(`\n[${frame.timestamp.toFixed(1)}s] Frame ${frame.frameNumber}:`);
+          lines.push(frame.description);
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
+            },
+          ],
+        };
+      }
+
+      case 'search_visual_content': {
+        if (!configManager.get().openaiApiKey) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Vision analysis requires OpenAI API key. Set openaiApiKey in config.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const input = args.input as string;
+        const query = args.query as string;
+        const interval = args.interval as number | undefined;
+
+        const result = await visionAnalyzer.searchVisualContent(input, query, {
+          interval,
+        });
+
+        if (!result.found) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `No matches found for: "${query}"`,
+              },
+            ],
+          };
+        }
+
+        const lines = [
+          `SEARCH RESULTS FOR: "${query}"`,
+          '='.repeat(80),
+          '',
+          `Matches found: ${result.matches.length}`,
+          '',
+          'INDIVIDUAL MATCHES',
+          '-'.repeat(80),
+        ];
+
+        for (const match of result.matches) {
+          lines.push(`\n[${match.timestamp.toFixed(1)}s] Confidence: ${match.confidence}%`);
+          lines.push(match.description);
+        }
+
+        if (result.segments && result.segments.length > 0) {
+          lines.push('');
+          lines.push('TIME SEGMENTS WHERE CONTENT APPEARS');
+          lines.push('-'.repeat(80));
+          for (const segment of result.segments) {
+            lines.push(`${segment.start.toFixed(1)}s - ${segment.end.toFixed(1)}s`);
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
+            },
+          ],
+        };
+      }
+
+      case 'describe_scene': {
+        if (!configManager.get().openaiApiKey) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Vision analysis requires OpenAI API key. Set openaiApiKey in config.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const input = args.input as string;
+        const timestamp = args.timestamp as number;
+        const detailLevel = (args.detailLevel as 'brief' | 'detailed' | 'comprehensive') || 'detailed';
+
+        const scene = await visionAnalyzer.describeScene(input, timestamp, detailLevel);
+
+        const lines = [
+          `SCENE DESCRIPTION AT ${timestamp.toFixed(1)}s`,
+          '='.repeat(80),
+          '',
+          scene.description,
+          '',
+          'OBJECTS DETECTED',
+          '-'.repeat(80),
+          scene.objects.length > 0 ? scene.objects.join(', ') : 'None detected',
+          '',
+          'ACTIONS/ACTIVITIES',
+          '-'.repeat(80),
+          scene.actions.length > 0 ? scene.actions.join(', ') : 'None detected',
+          '',
+          'SETTING/ENVIRONMENT',
+          '-'.repeat(80),
+          scene.setting || 'Not determined',
+        ];
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
+            },
+          ],
+        };
+      }
+
+      case 'find_objects_in_video': {
+        if (!configManager.get().openaiApiKey) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Vision analysis requires OpenAI API key. Set openaiApiKey in config.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const input = args.input as string;
+        const targetDescription = args.targetDescription as string;
+        const interval = args.interval as number | undefined;
+
+        const result = await visionAnalyzer.findAppearances(input, targetDescription, {
+          interval,
+        });
+
+        if (result.appearances.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `"${targetDescription}" not found in video`,
+              },
+            ],
+          };
+        }
+
+        const lines = [
+          `TRACKING: "${targetDescription}"`,
+          '='.repeat(80),
+          '',
+          `Total appearances: ${result.appearances.length}`,
+          `Total duration on screen: ${result.totalDuration.toFixed(1)}s`,
+          '',
+          'APPEARANCE SEGMENTS',
+          '-'.repeat(80),
+        ];
+
+        for (let i = 0; i < result.appearances.length; i++) {
+          const app = result.appearances[i];
+          const duration = app.end - app.start;
+          lines.push(`\n${i + 1}. ${app.start.toFixed(1)}s - ${app.end.toFixed(1)}s (${duration.toFixed(1)}s)`);
+          lines.push(`   ${app.description}`);
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: lines.join('\n'),
+            },
+          ],
+        };
+      }
+
+      case 'compare_video_frames': {
+        if (!configManager.get().openaiApiKey) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Vision analysis requires OpenAI API key. Set openaiApiKey in config.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const input = args.input as string;
+        const timestamp1 = args.timestamp1 as number;
+        const timestamp2 = args.timestamp2 as number;
+
+        const comparison = await visionAnalyzer.compareFrames(input, timestamp1, timestamp2);
+
+        const lines = [
+          `FRAME COMPARISON: ${timestamp1.toFixed(1)}s vs ${timestamp2.toFixed(1)}s`,
+          '='.repeat(80),
+          '',
+          `Change detected: ${comparison.changeDetected ? 'YES' : 'NO'}`,
+          '',
+          'WHAT CHANGED',
+          '-'.repeat(80),
+          comparison.changeDescription,
+          '',
+          'FRAME DESCRIPTIONS',
+          '-'.repeat(80),
+          comparison.differences,
+        ];
 
         return {
           content: [
