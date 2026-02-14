@@ -56,3 +56,5 @@ Thumbs.db
 temp/
 tmp/
 .mcp-video-vision-temp/
+bin/mcp-video-editor
+.claude/settings.local.json

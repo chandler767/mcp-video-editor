@@ -1,0 +1,19 @@
+{
+  "name": "MCP Video Editor",
+  "outputfilename": "mcp-video-editor-desktop",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev": "npm run dev",
+  "frontend:dev:port": "auto",
+  "frontend:dev:open": false,
+  "author": {
+    "name": "Chandler Mayo",
+    "email": ""
+  },
+  "info": {
+    "productName": "MCP Video Editor",
+    "productVersion": "1.0.0",
+    "copyright": "© 2024-2026 Chandler Mayo",
+    "comments": "Professional video editing powered by AI"
+  }
+}

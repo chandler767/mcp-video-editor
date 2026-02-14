@@ -9,12 +9,16 @@ import (
 // Config holds all configuration for the MCP video editor
 type Config struct {
 	OpenAIKey        string            `json:"openaiApiKey"`
+	ClaudeAPIKey     string            `json:"claudeApiKey,omitempty"`
 	ElevenLabsKey    string            `json:"elevenLabsApiKey,omitempty"`
 	ElevenLabsVoices map[string]string `json:"elevenLabsVoices,omitempty"`
 	FFmpegPath       string            `json:"ffmpegPath,omitempty"`
 	FFprobePath      string            `json:"ffprobePath,omitempty"`
 	DefaultQuality   string            `json:"defaultQuality,omitempty"`
 	TempDir          string            `json:"tempDir,omitempty"`
+	AgentProvider    string            `json:"agentProvider,omitempty"` // "claude" or "openai"
+	AgentModel       string            `json:"agentModel,omitempty"`    // Model to use
+	LastProjectDir   string            `json:"lastProjectDir,omitempty"` // Remember last project directory
 }
 
 // Load reads configuration from ~/.mcp-video-config.json
@@ -40,6 +44,9 @@ func Load() (*Config, error) {
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
 		cfg.OpenAIKey = key
 	}
+	if key := os.Getenv("CLAUDE_API_KEY"); key != "" {
+		cfg.ClaudeAPIKey = key
+	}
 	if key := os.Getenv("ELEVENLABS_API_KEY"); key != "" {
 		cfg.ElevenLabsKey = key
 	}
@@ -48,6 +55,16 @@ func Load() (*Config, error) {
 	}
 	if path := os.Getenv("FFPROBE_PATH"); path != "" {
 		cfg.FFprobePath = path
+	}
+
+	// Set default agent provider if not set
+	if cfg.AgentProvider == "" {
+		// Default to Claude if key is available, otherwise OpenAI
+		if cfg.ClaudeAPIKey != "" {
+			cfg.AgentProvider = "claude"
+		} else if cfg.OpenAIKey != "" {
+			cfg.AgentProvider = "openai"
+		}
 	}
 
 	return cfg, nil
@@ -77,6 +94,10 @@ func (c *Config) Update(updates map[string]interface{}) error {
 			if v, ok := value.(string); ok {
 				c.OpenAIKey = v
 			}
+		case "claudeKey", "claudeApiKey":
+			if v, ok := value.(string); ok {
+				c.ClaudeAPIKey = v
+			}
 		case "elevenLabsKey", "elevenLabsApiKey":
 			if v, ok := value.(string); ok {
 				c.ElevenLabsKey = v
@@ -97,6 +118,18 @@ func (c *Config) Update(updates map[string]interface{}) error {
 			if v, ok := value.(string); ok {
 				c.TempDir = v
 			}
+		case "agentProvider":
+			if v, ok := value.(string); ok {
+				c.AgentProvider = v
+			}
+		case "agentModel":
+			if v, ok := value.(string); ok {
+				c.AgentModel = v
+			}
+		case "lastProjectDir":
+			if v, ok := value.(string); ok {
+				c.LastProjectDir = v
+			}
 		}
 	}
 	return c.Save()
@@ -105,12 +138,16 @@ func (c *Config) Update(updates map[string]interface{}) error {
 // Reset resets configuration to defaults
 func (c *Config) Reset() error {
 	c.OpenAIKey = ""
+	c.ClaudeAPIKey = ""
 	c.ElevenLabsKey = ""
 	c.ElevenLabsVoices = nil
 	c.FFmpegPath = ""
 	c.FFprobePath = ""
 	c.DefaultQuality = "high"
 	c.TempDir = os.TempDir()
+	c.AgentProvider = ""
+	c.AgentModel = ""
+	c.LastProjectDir = ""
 	return c.Save()
 }
 
@@ -118,12 +155,16 @@ func (c *Config) Reset() error {
 func (c *Config) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"openaiKey":        maskAPIKey(c.OpenAIKey),
+		"claudeKey":        maskAPIKey(c.ClaudeAPIKey),
 		"elevenLabsKey":    maskAPIKey(c.ElevenLabsKey),
 		"elevenLabsVoices": c.ElevenLabsVoices,
 		"ffmpegPath":       c.FFmpegPath,
 		"ffprobePath":      c.FFprobePath,
 		"defaultQuality":   c.DefaultQuality,
 		"tempDir":          c.TempDir,
+		"agentProvider":    c.AgentProvider,
+		"agentModel":       c.AgentModel,
+		"lastProjectDir":   c.LastProjectDir,
 	}
 }
 

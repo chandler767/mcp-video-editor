@@ -20,6 +20,15 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// ToolResult represents the result of executing an MCP tool
+// This is used by the desktop UI bridge
+type ToolResult struct {
+	Success bool        `json:"success"`
+	Content string      `json:"content,omitempty"`
+	Error   string      `json:"error,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
 // MCPServer wraps the MCP server with video editing capabilities
 type MCPServer struct {
 	server           *server.MCPServer
@@ -39,6 +48,7 @@ type MCPServer struct {
 	ttsOps           *audio.TTSOperations
 	audioReplacement *audio.ReplacementOperations
 	audioOps         *audio.Operations
+	tools            []mcp.Tool // Registry of all registered tools
 }
 
 // NewMCPServer creates a new MCP server instance
@@ -225,8 +235,14 @@ func (s *MCPServer) registerTools() {
 
 // Tool registration methods
 
+// addTool is a helper that adds a tool to both the MCP server and our internal registry
+func (s *MCPServer) addTool(tool mcp.Tool, handler func(map[string]interface{}) (*mcp.CallToolResult, error)) {
+	s.server.AddTool(tool, handler)
+	s.tools = append(s.tools, tool)
+}
+
 func (s *MCPServer) registerGetVideoInfo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "get_video_info",
 		Description: "Get metadata and information about a video file",
 		InputSchema: mcp.ToolInputSchema{
@@ -243,7 +259,7 @@ func (s *MCPServer) registerGetVideoInfo() {
 }
 
 func (s *MCPServer) registerTrimVideo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "trim_video",
 		Description: "Cut/trim a video by specifying start time and end time or duration",
 		InputSchema: mcp.ToolInputSchema{
@@ -276,7 +292,7 @@ func (s *MCPServer) registerTrimVideo() {
 }
 
 func (s *MCPServer) registerConcatenateVideos() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "concatenate_videos",
 		Description: "Join multiple videos together into a single video file",
 		InputSchema: mcp.ToolInputSchema{
@@ -300,7 +316,7 @@ func (s *MCPServer) registerConcatenateVideos() {
 }
 
 func (s *MCPServer) registerResizeVideo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "resize_video",
 		Description: "Change the resolution of a video",
 		InputSchema: mcp.ToolInputSchema{
@@ -333,7 +349,7 @@ func (s *MCPServer) registerResizeVideo() {
 }
 
 func (s *MCPServer) registerExtractAudio() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "extract_audio",
 		Description: "Extract audio track from a video file",
 		InputSchema: mcp.ToolInputSchema{
@@ -358,7 +374,7 @@ func (s *MCPServer) registerExtractAudio() {
 }
 
 func (s *MCPServer) registerTranscodeVideo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "transcode_video",
 		Description: "Convert video to different format/codec",
 		InputSchema: mcp.ToolInputSchema{
@@ -383,7 +399,7 @@ func (s *MCPServer) registerTranscodeVideo() {
 }
 
 func (s *MCPServer) registerApplyBlur() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "apply_blur_effect",
 		Description: "Apply blur effect to video",
 		InputSchema: mcp.ToolInputSchema{
@@ -412,7 +428,7 @@ func (s *MCPServer) registerApplyBlur() {
 }
 
 func (s *MCPServer) registerApplyColorGrade() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "apply_color_grade",
 		Description: "Apply color grading adjustments",
 		InputSchema: mcp.ToolInputSchema{
@@ -445,7 +461,7 @@ func (s *MCPServer) registerApplyColorGrade() {
 }
 
 func (s *MCPServer) registerApplyChromaKey() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "apply_chroma_key",
 		Description: "Remove green screen (chroma key)",
 		InputSchema: mcp.ToolInputSchema{
@@ -474,7 +490,7 @@ func (s *MCPServer) registerApplyChromaKey() {
 }
 
 func (s *MCPServer) registerApplyVignette() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "apply_vignette",
 		Description: "Apply vignette effect (darkened edges)",
 		InputSchema: mcp.ToolInputSchema{
@@ -499,7 +515,7 @@ func (s *MCPServer) registerApplyVignette() {
 }
 
 func (s *MCPServer) registerApplySharpen() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "apply_sharpen",
 		Description: "Apply sharpen effect to video",
 		InputSchema: mcp.ToolInputSchema{
@@ -524,7 +540,7 @@ func (s *MCPServer) registerApplySharpen() {
 }
 
 func (s *MCPServer) registerCreatePictureInPicture() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "create_picture_in_picture",
 		Description: "Create picture-in-picture effect",
 		InputSchema: mcp.ToolInputSchema{
@@ -553,7 +569,7 @@ func (s *MCPServer) registerCreatePictureInPicture() {
 }
 
 func (s *MCPServer) registerCreateSplitScreen() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "create_split_screen",
 		Description: "Create split screen layout",
 		InputSchema: mcp.ToolInputSchema{
@@ -581,7 +597,7 @@ func (s *MCPServer) registerCreateSplitScreen() {
 }
 
 func (s *MCPServer) registerAddTransition() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "add_transition",
 		Description: "Add transition between two videos",
 		InputSchema: mcp.ToolInputSchema{
@@ -614,7 +630,7 @@ func (s *MCPServer) registerAddTransition() {
 }
 
 func (s *MCPServer) registerCrossfadeVideos() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "crossfade_videos",
 		Description: "Smoothly crossfade between two videos",
 		InputSchema: mcp.ToolInputSchema{
@@ -645,7 +661,7 @@ func (s *MCPServer) registerCrossfadeVideos() {
 // Text operation registrations
 
 func (s *MCPServer) registerAddTextOverlay() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "add_text_overlay",
 		Description: "Add text overlay to video with positioning, styling, and effects",
 		InputSchema: mcp.ToolInputSchema{
@@ -702,7 +718,7 @@ func (s *MCPServer) registerAddTextOverlay() {
 }
 
 func (s *MCPServer) registerAddAnimatedText() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "add_animated_text",
 		Description: "Add animated text to video (fade, slide, zoom effects)",
 		InputSchema: mcp.ToolInputSchema{
@@ -743,7 +759,7 @@ func (s *MCPServer) registerAddAnimatedText() {
 }
 
 func (s *MCPServer) registerBurnSubtitles() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "burn_subtitles",
 		Description: "Burn subtitles into video from SRT/VTT file",
 		InputSchema: mcp.ToolInputSchema{
@@ -778,7 +794,7 @@ func (s *MCPServer) registerBurnSubtitles() {
 // Additional video operation registrations
 
 func (s *MCPServer) registerExtractFrames() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "extract_frames",
 		Description: "Extract frames from video as images",
 		InputSchema: mcp.ToolInputSchema{
@@ -815,7 +831,7 @@ func (s *MCPServer) registerExtractFrames() {
 }
 
 func (s *MCPServer) registerAdjustSpeed() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "adjust_speed",
 		Description: "Adjust video playback speed (slow motion or fast forward)",
 		InputSchema: mcp.ToolInputSchema{
@@ -840,7 +856,7 @@ func (s *MCPServer) registerAdjustSpeed() {
 }
 
 func (s *MCPServer) registerConvertVideo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "convert_video",
 		Description: "Convert video to different format with codec and quality options",
 		InputSchema: mcp.ToolInputSchema{
@@ -873,7 +889,7 @@ func (s *MCPServer) registerConvertVideo() {
 }
 
 func (s *MCPServer) registerTranscodeForWeb() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "transcode_for_web",
 		Description: "Transcode video optimized for web platforms (YouTube, Vimeo, social media)",
 		InputSchema: mcp.ToolInputSchema{
@@ -908,7 +924,7 @@ func (s *MCPServer) registerTranscodeForWeb() {
 // Config management registrations
 
 func (s *MCPServer) registerGetConfig() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "get_config",
 		Description: "Get current configuration settings",
 		InputSchema: mcp.ToolInputSchema{
@@ -920,7 +936,7 @@ func (s *MCPServer) registerGetConfig() {
 }
 
 func (s *MCPServer) registerSetConfig() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "set_config",
 		Description: "Update configuration settings",
 		InputSchema: mcp.ToolInputSchema{
@@ -953,7 +969,7 @@ func (s *MCPServer) registerSetConfig() {
 }
 
 func (s *MCPServer) registerResetConfig() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "reset_config",
 		Description: "Reset configuration to defaults",
 		InputSchema: mcp.ToolInputSchema{
@@ -967,7 +983,7 @@ func (s *MCPServer) registerResetConfig() {
 // Additional visual effects registrations
 
 func (s *MCPServer) registerApplyKenBurns() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "apply_ken_burns",
 		Description: "Apply Ken Burns effect (zoom and pan) to still image",
 		InputSchema: mcp.ToolInputSchema{
@@ -1018,7 +1034,7 @@ func (s *MCPServer) registerApplyKenBurns() {
 // Visual elements registrations
 
 func (s *MCPServer) registerAddImageOverlay() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "add_image_overlay",
 		Description: "Overlay an image on video with positioning, scaling, and effects",
 		InputSchema: mcp.ToolInputSchema{
@@ -1083,7 +1099,7 @@ func (s *MCPServer) registerAddImageOverlay() {
 }
 
 func (s *MCPServer) registerAddShape() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "add_shape",
 		Description: "Draw shapes on video (rectangle, circle, line, arrow)",
 		InputSchema: mcp.ToolInputSchema{
@@ -1158,7 +1174,7 @@ func (s *MCPServer) registerAddShape() {
 // Transcript operation registrations
 
 func (s *MCPServer) registerExtractTranscript() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "extract_transcript",
 		Description: "Extract transcript from video using OpenAI Whisper",
 		InputSchema: mcp.ToolInputSchema{
@@ -1187,7 +1203,7 @@ func (s *MCPServer) registerExtractTranscript() {
 }
 
 func (s *MCPServer) registerFindInTranscript() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "find_in_transcript",
 		Description: "Search for text in transcript and get timestamps",
 		InputSchema: mcp.ToolInputSchema{
@@ -1208,7 +1224,7 @@ func (s *MCPServer) registerFindInTranscript() {
 }
 
 func (s *MCPServer) registerRemoveByTranscript() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "remove_by_transcript",
 		Description: "Remove portions of video based on transcript text",
 		InputSchema: mcp.ToolInputSchema{
@@ -1237,7 +1253,7 @@ func (s *MCPServer) registerRemoveByTranscript() {
 }
 
 func (s *MCPServer) registerTrimToScript() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "trim_to_script",
 		Description: "Trim video to keep only portions matching a script",
 		InputSchema: mcp.ToolInputSchema{
@@ -1268,7 +1284,7 @@ func (s *MCPServer) registerTrimToScript() {
 // Timeline operation registrations
 
 func (s *MCPServer) registerCreateTimeline() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "create_timeline",
 		Description: "Create a new timeline for tracking video editing operations with undo/redo support",
 		InputSchema: mcp.ToolInputSchema{
@@ -1289,7 +1305,7 @@ func (s *MCPServer) registerCreateTimeline() {
 }
 
 func (s *MCPServer) registerAddToTimeline() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "add_to_timeline",
 		Description: "Add an operation to the timeline",
 		InputSchema: mcp.ToolInputSchema{
@@ -1326,7 +1342,7 @@ func (s *MCPServer) registerAddToTimeline() {
 }
 
 func (s *MCPServer) registerViewTimeline() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "view_timeline",
 		Description: "View timeline history and current state",
 		InputSchema: mcp.ToolInputSchema{
@@ -1343,7 +1359,7 @@ func (s *MCPServer) registerViewTimeline() {
 }
 
 func (s *MCPServer) registerJumpToTimelinePoint() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "jump_to_timeline_point",
 		Description: "Jump to a specific point in the timeline",
 		InputSchema: mcp.ToolInputSchema{
@@ -1364,7 +1380,7 @@ func (s *MCPServer) registerJumpToTimelinePoint() {
 }
 
 func (s *MCPServer) registerUndo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "undo",
 		Description: "Undo the last operation in the timeline",
 		InputSchema: mcp.ToolInputSchema{
@@ -1381,7 +1397,7 @@ func (s *MCPServer) registerUndo() {
 }
 
 func (s *MCPServer) registerRedo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "redo",
 		Description: "Redo the next operation in the timeline",
 		InputSchema: mcp.ToolInputSchema{
@@ -1400,7 +1416,7 @@ func (s *MCPServer) registerRedo() {
 // Multi-take registration methods
 
 func (s *MCPServer) registerCreateMultiTakeProject() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "create_multi_take_project",
 		Description: "Create a new multi-take editing project",
 		InputSchema: mcp.ToolInputSchema{
@@ -1421,7 +1437,7 @@ func (s *MCPServer) registerCreateMultiTakeProject() {
 }
 
 func (s *MCPServer) registerAddTakesToProject() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "add_takes_to_project",
 		Description: "Add video takes to a multi-take project",
 		InputSchema: mcp.ToolInputSchema{
@@ -1445,7 +1461,7 @@ func (s *MCPServer) registerAddTakesToProject() {
 }
 
 func (s *MCPServer) registerAnalyzeTakes() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "analyze_takes",
 		Description: "Analyze all takes in the project and match to script sections",
 		InputSchema: mcp.ToolInputSchema{
@@ -1462,7 +1478,7 @@ func (s *MCPServer) registerAnalyzeTakes() {
 }
 
 func (s *MCPServer) registerSelectBestTakes() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "select_best_takes",
 		Description: "Select the best takes for each script section",
 		InputSchema: mcp.ToolInputSchema{
@@ -1479,7 +1495,7 @@ func (s *MCPServer) registerSelectBestTakes() {
 }
 
 func (s *MCPServer) registerAssembleBestTakes() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "assemble_best_takes",
 		Description: "Assemble the best takes into a final video",
 		InputSchema: mcp.ToolInputSchema{
@@ -1500,7 +1516,7 @@ func (s *MCPServer) registerAssembleBestTakes() {
 }
 
 func (s *MCPServer) registerListMultiTakeProjects() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "list_multi_take_projects",
 		Description: "List all multi-take projects",
 		InputSchema: mcp.ToolInputSchema{
@@ -1511,7 +1527,7 @@ func (s *MCPServer) registerListMultiTakeProjects() {
 }
 
 func (s *MCPServer) registerCleanupProjectTemp() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "cleanup_project_temp",
 		Description: "Clean up temporary files for a project",
 		InputSchema: mcp.ToolInputSchema{
@@ -1528,7 +1544,7 @@ func (s *MCPServer) registerCleanupProjectTemp() {
 }
 
 func (s *MCPServer) registerListTimelines() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "list_timelines",
 		Description: "List all editing timelines",
 		InputSchema: mcp.ToolInputSchema{
@@ -1539,7 +1555,7 @@ func (s *MCPServer) registerListTimelines() {
 }
 
 func (s *MCPServer) registerGetTimelineStats() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "get_timeline_stats",
 		Description: "Get statistics about timeline operations (total, completed, failed, duration, etc.)",
 		InputSchema: mcp.ToolInputSchema{
@@ -1556,7 +1572,7 @@ func (s *MCPServer) registerGetTimelineStats() {
 }
 
 func (s *MCPServer) registerExportFinalVideo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "export_final_video",
 		Description: "Export and transcode the final assembled video for web delivery",
 		InputSchema: mcp.ToolInputSchema{
@@ -1584,7 +1600,7 @@ func (s *MCPServer) registerExportFinalVideo() {
 // Video vision analysis registration methods
 
 func (s *MCPServer) registerAnalyzeVideoContent() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "analyze_video_content",
 		Description: "Analyze visual content of video by extracting and analyzing frames with GPT-4 Vision. Returns frame descriptions, objects detected, and overall summary.",
 		InputSchema: mcp.ToolInputSchema{
@@ -1609,7 +1625,7 @@ func (s *MCPServer) registerAnalyzeVideoContent() {
 }
 
 func (s *MCPServer) registerCompareVideoFrames() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "compare_video_frames",
 		Description: "Compare two frames from a video at different timestamps and describe the differences",
 		InputSchema: mcp.ToolInputSchema{
@@ -1634,7 +1650,7 @@ func (s *MCPServer) registerCompareVideoFrames() {
 }
 
 func (s *MCPServer) registerDescribeScene() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "describe_scene",
 		Description: "Describe a specific scene in the video at a given timestamp using GPT-4 Vision",
 		InputSchema: mcp.ToolInputSchema{
@@ -1659,7 +1675,7 @@ func (s *MCPServer) registerDescribeScene() {
 }
 
 func (s *MCPServer) registerFindObjectsInVideo() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "find_objects_in_video",
 		Description: "Find specific objects or elements in video frames using GPT-4 Vision",
 		InputSchema: mcp.ToolInputSchema{
@@ -1684,7 +1700,7 @@ func (s *MCPServer) registerFindObjectsInVideo() {
 }
 
 func (s *MCPServer) registerSearchVisualContent() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "search_visual_content",
 		Description: "Search for specific visual content throughout the video and return matching timestamps",
 		InputSchema: mcp.ToolInputSchema{
@@ -1709,7 +1725,7 @@ func (s *MCPServer) registerSearchVisualContent() {
 }
 
 func (s *MCPServer) registerGenerateTimeline() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "generate_timeline",
 		Description: "Generate a timeline diagram from events data and save as image",
 		InputSchema: mcp.ToolInputSchema{
@@ -1764,7 +1780,7 @@ func (s *MCPServer) registerGenerateTimeline() {
 }
 
 func (s *MCPServer) registerGenerateFlowchart() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "generate_flowchart",
 		Description: "Generate a flowchart diagram from nodes and connections and save as image",
 		InputSchema: mcp.ToolInputSchema{
@@ -1822,7 +1838,7 @@ func (s *MCPServer) registerGenerateFlowchart() {
 }
 
 func (s *MCPServer) registerGenerateOrgChart() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "generate_org_chart",
 		Description: "Generate an organization chart from hierarchical data and save as image",
 		InputSchema: mcp.ToolInputSchema{
@@ -1877,7 +1893,7 @@ func (s *MCPServer) registerGenerateOrgChart() {
 }
 
 func (s *MCPServer) registerGenerateMindMap() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "generate_mind_map",
 		Description: "Generate a mind map diagram from hierarchical data with radial layout and save as image",
 		InputSchema: mcp.ToolInputSchema{
@@ -1932,7 +1948,7 @@ func (s *MCPServer) registerGenerateMindMap() {
 }
 
 func (s *MCPServer) registerCreateSideBySide() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "create_side_by_side",
 		Description: "Place two videos side by side horizontally",
 		InputSchema: mcp.ToolInputSchema{
@@ -1957,7 +1973,7 @@ func (s *MCPServer) registerCreateSideBySide() {
 }
 
 func (s *MCPServer) registerCreateVideoFromImages() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "create_video_from_images",
 		Description: "Create a video from a sequence of image files",
 		InputSchema: mcp.ToolInputSchema{
@@ -1982,7 +1998,7 @@ func (s *MCPServer) registerCreateVideoFromImages() {
 }
 
 func (s *MCPServer) registerGetAudioStats() {
-	s.server.AddTool(mcp.Tool{
+	s.addTool(mcp.Tool{
 		Name:        "get_audio_stats",
 		Description: "Get audio statistics and analysis from a video or audio file",
 		InputSchema: mcp.ToolInputSchema{
@@ -1996,4 +2012,143 @@ func (s *MCPServer) registerGetAudioStats() {
 			Required: []string{"input"},
 		},
 	}, s.handleGetAudioStats)
+}
+
+// ExecuteToolDirect executes an MCP tool directly without going through the JSON-RPC layer
+// This is used by the desktop UI bridge to call tools programmatically
+func (s *MCPServer) ExecuteToolDirect(name string, args map[string]interface{}) (*ToolResult, error) {
+	// Create a map of tool names to handler functions
+	handlers := map[string]func(map[string]interface{}) (*mcp.CallToolResult, error){
+		"get_video_info":              s.handleGetVideoInfo,
+		"trim_video":                  s.handleTrimVideo,
+		"concatenate_videos":          s.handleConcatenateVideos,
+		"resize_video":                s.handleResizeVideo,
+		"extract_audio":               s.handleExtractAudio,
+		"transcode_video":             s.handleTranscodeVideo,
+		"apply_blur_effect":           s.handleApplyBlur,
+		"apply_color_grade":           s.handleApplyColorGrade,
+		"apply_chroma_key":            s.handleApplyChromaKey,
+		"apply_vignette":              s.handleApplyVignette,
+		"apply_sharpen":               s.handleApplySharpen,
+		"create_picture_in_picture":   s.handleCreatePictureInPicture,
+		"create_split_screen":         s.handleCreateSplitScreen,
+		"create_side_by_side":         s.handleCreateSideBySide,
+		"add_transition":              s.handleAddTransition,
+		"crossfade_videos":            s.handleCrossfadeVideos,
+		"add_text_overlay":            s.handleAddTextOverlay,
+		"add_animated_text":           s.handleAddAnimatedText,
+		"burn_subtitles":              s.handleBurnSubtitles,
+		"extract_frames":              s.handleExtractFrames,
+		"adjust_speed":                s.handleAdjustSpeed,
+		"convert_video":               s.handleConvertVideo,
+		"transcode_for_web":           s.handleTranscodeForWeb,
+		"create_video_from_images":    s.handleCreateVideoFromImages,
+		"get_audio_stats":             s.handleGetAudioStats,
+		"trim_audio":                  s.handleTrimAudio,
+		"concatenate_audio":           s.handleConcatenateAudio,
+		"adjust_audio_volume":         s.handleAdjustAudioVolume,
+		"normalize_audio":             s.handleNormalizeAudio,
+		"fade_audio":                  s.handleFadeAudio,
+		"mix_audio":                   s.handleMixAudio,
+		"convert_audio":               s.handleConvertAudio,
+		"adjust_audio_speed":          s.handleAdjustAudioSpeed,
+		"remove_audio_section":        s.handleRemoveAudioSection,
+		"split_audio":                 s.handleSplitAudio,
+		"reverse_audio":               s.handleReverseAudio,
+		"extract_audio_channel":       s.handleExtractAudioChannel,
+		"replace_spoken_word":         s.handleReplaceSpokenWord,
+		"clone_voice_from_audio":      s.handleCloneVoiceFromAudio,
+		"generate_speech":             s.handleGenerateSpeech,
+		"get_word_timestamps":         s.handleGetWordTimestamps,
+		"list_cached_voices":          s.handleListCachedVoices,
+		"clear_cached_voice":          s.handleClearCachedVoice,
+		"clear_all_cached_voices":     s.handleClearAllCachedVoices,
+		"get_config":                  s.handleGetConfig,
+		"set_config":                  s.handleSetConfig,
+		"reset_config":                s.handleResetConfig,
+		"apply_ken_burns":             s.handleApplyKenBurns,
+		"add_image_overlay":           s.handleAddImageOverlay,
+		"add_shape":                   s.handleAddShape,
+		"extract_transcript":          s.handleExtractTranscript,
+		"find_in_transcript":          s.handleFindInTranscript,
+		"remove_by_transcript":        s.handleRemoveByTranscript,
+		"trim_to_script":              s.handleTrimToScript,
+		"create_timeline":             s.handleCreateTimeline,
+		"add_to_timeline":             s.handleAddToTimeline,
+		"view_timeline":               s.handleViewTimeline,
+		"jump_to_timeline_point":      s.handleJumpToTimelinePoint,
+		"undo":                        s.handleUndo,
+		"redo":                        s.handleRedo,
+		"list_timelines":              s.handleListTimelines,
+		"get_timeline_stats":          s.handleGetTimelineStats,
+		"create_multi_take_project":   s.handleCreateMultiTakeProject,
+		"add_takes_to_project":        s.handleAddTakesToProject,
+		"analyze_takes":               s.handleAnalyzeTakes,
+		"select_best_takes":           s.handleSelectBestTakes,
+		"assemble_best_takes":         s.handleAssembleBestTakes,
+		"list_multi_take_projects":    s.handleListMultiTakeProjects,
+		"cleanup_project_temp":        s.handleCleanupProjectTemp,
+		"export_final_video":          s.handleExportFinalVideo,
+		"analyze_video_content":       s.handleAnalyzeVideoContent,
+		"compare_video_frames":        s.handleCompareVideoFrames,
+		"describe_scene":              s.handleDescribeScene,
+		"find_objects_in_video":       s.handleFindObjectsInVideo,
+		"search_visual_content":       s.handleSearchVisualContent,
+		"generate_timeline_diagram":   s.handleGenerateTimeline,
+		"generate_flowchart":          s.handleGenerateFlowchart,
+		"generate_org_chart":          s.handleGenerateOrgChart,
+		"generate_mind_map":           s.handleGenerateMindMap,
+	}
+
+	// Look up the handler
+	handler, exists := handlers[name]
+	if !exists {
+		return &ToolResult{
+			Success: false,
+			Error:   fmt.Sprintf("unknown tool: %s", name),
+		}, nil
+	}
+
+	// Execute the handler
+	result, err := handler(args)
+	if err != nil {
+		return &ToolResult{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	// Convert MCP result to ToolResult
+	if result.IsError {
+		// Extract error text from content
+		errorText := "Unknown error"
+		if len(result.Content) > 0 {
+			if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
+				errorText = textContent.Text
+			}
+		}
+		return &ToolResult{
+			Success: false,
+			Error:   errorText,
+		}, nil
+	}
+
+	// Extract success content
+	contentText := ""
+	if len(result.Content) > 0 {
+		if textContent, ok := mcp.AsTextContent(result.Content[0]); ok {
+			contentText = textContent.Text
+		}
+	}
+
+	return &ToolResult{
+		Success: true,
+		Content: contentText,
+	}, nil
+}
+
+// GetToolDefinitions returns the schemas for all registered tools
+// This is used by the desktop UI to understand what tools are available
+func (s *MCPServer) GetToolDefinitions() []mcp.Tool {
+	return s.tools
 }
