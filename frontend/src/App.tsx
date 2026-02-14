@@ -2,11 +2,13 @@ import { useState } from 'react'
 import ChatDialog from './components/chat/ChatDialog'
 import SettingsDialog from './components/settings/SettingsDialog'
 import AboutDialog from './components/about/AboutDialog'
+import KeyboardShortcutsHelp from './components/keyboard/KeyboardShortcutsHelp'
 import Timeline from './components/timeline/Timeline'
 import VideoPreview from './components/video/VideoPreview'
 import FileImportZone from './components/import/FileImportZone'
 import FileList from './components/import/FileList'
 import WorkflowPresets from './components/presets/WorkflowPresets'
+import { useKeyboardShortcuts, KeyboardShortcut } from './lib/hooks/useKeyboardShortcuts'
 
 type View = 'chat' | 'timeline' | 'import' | 'presets'
 
@@ -36,10 +38,70 @@ function App() {
   const [activeView, setActiveView] = useState<View>('chat')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isAboutOpen, setIsAboutOpen] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [importedFiles, setImportedFiles] = useState<ImportedFile[]>([])
   const [selectedFileId, setSelectedFileId] = useState<string>()
   const [operations] = useState<Operation[]>([])
   const [currentVideoPath, setCurrentVideoPath] = useState<string>()
+
+  // Define keyboard shortcuts
+  const shortcuts: KeyboardShortcut[] = [
+    {
+      key: '1',
+      metaKey: true,
+      description: 'Switch to Chat view',
+      action: () => setActiveView('chat'),
+    },
+    {
+      key: '2',
+      metaKey: true,
+      description: 'Switch to Timeline view',
+      action: () => setActiveView('timeline'),
+    },
+    {
+      key: '3',
+      metaKey: true,
+      description: 'Switch to Files view',
+      action: () => setActiveView('import'),
+    },
+    {
+      key: '4',
+      metaKey: true,
+      description: 'Switch to Presets view',
+      action: () => setActiveView('presets'),
+    },
+    {
+      key: ',',
+      metaKey: true,
+      description: 'Open settings',
+      action: () => setIsSettingsOpen(true),
+    },
+    {
+      key: '?',
+      shiftKey: true,
+      description: 'Show keyboard shortcuts help',
+      action: () => setIsHelpOpen(true),
+      preventDefault: false,
+    },
+    {
+      key: 'F1',
+      description: 'Show keyboard shortcuts help',
+      action: () => setIsHelpOpen(true),
+    },
+    {
+      key: 'Escape',
+      description: 'Close dialogs',
+      action: () => {
+        setIsSettingsOpen(false)
+        setIsAboutOpen(false)
+        setIsHelpOpen(false)
+      },
+      preventDefault: false,
+    },
+  ]
+
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts(shortcuts)
 
   const handleFilesAdded = (files: File[]) => {
     const newFiles: ImportedFile[] = files.map((file) => ({
@@ -138,6 +200,13 @@ function App() {
 
         <div className="flex items-center space-x-2">
           <button
+            onClick={() => setIsHelpOpen(true)}
+            className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            title="Keyboard Shortcuts (? or F1)"
+          >
+            ⌨️
+          </button>
+          <button
             onClick={() => setIsAboutOpen(true)}
             className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
             title="About"
@@ -147,6 +216,7 @@ function App() {
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            title="Settings (⌘,)"
           >
             ⚙️ Settings
           </button>
@@ -235,6 +305,13 @@ function App() {
       <AboutDialog
         isOpen={isAboutOpen}
         onClose={() => setIsAboutOpen(false)}
+      />
+
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        shortcuts={shortcuts}
       />
     </div>
   )
