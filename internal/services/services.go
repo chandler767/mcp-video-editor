@@ -140,6 +140,11 @@ func (s *Services) GetConfig() *config.Config {
 func (s *Services) UpdateConfig(cfg *config.Config) error {
 	s.config = cfg
 
+	// Persist config to disk
+	if err := cfg.Save(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
 	// Recreate agent with new config if provider/key changed
 	agentConfig := agent.AgentConfig{
 		Provider: getAgentProvider(cfg),
