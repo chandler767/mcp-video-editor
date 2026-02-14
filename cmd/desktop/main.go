@@ -1,7 +1,6 @@
 package main
 
 import (
-	"embed"
 	"fmt"
 	"log"
 	"os"
@@ -14,8 +13,9 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-//go:embed all:../../frontend/dist
-var assets embed.FS
+// Note: Assets are handled by Wails build system.
+// During development (wails dev), frontend is served from dev server.
+// During production build (wails build), assets are automatically embedded.
 
 func main() {
 	// Load .env file if exists
@@ -39,9 +39,6 @@ func main() {
 		log.Fatalf("Failed to create services: %v", err)
 	}
 
-	// Create Wails bridge
-	bridge := wailsbridge.NewBridge(services)
-
 	// Log initialization
 	fmt.Fprintln(os.Stderr, "MCP Video Editor Desktop - Starting...")
 	fmt.Fprintf(os.Stderr, "FFmpeg initialized successfully\n")
@@ -53,22 +50,24 @@ func main() {
 	}
 
 	// Create Wails application
+	// Note: In development mode, assets are served from the dev server.
+	// In production builds, Wails automatically handles asset embedding.
 	app := application.New(application.Options{
 		Name:        "MCP Video Editor",
 		Description: "AI-powered video editing desktop application",
-		Services: []application.Service{
-			application.NewService(bridge),
-		},
-		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(assets),
-		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
 
+	// Create Wails bridge (needs app reference for dialogs)
+	bridge := wailsbridge.NewBridge(app, services)
+
+	// Register bridge as a service
+	app.RegisterService(application.NewService(bridge))
+
 	// Create main window
-	app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "MCP Video Editor",
 		Width:  1440,
 		Height: 900,

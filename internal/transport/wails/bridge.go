@@ -6,18 +6,21 @@ import (
 
 	"github.com/chandler-mayo/mcp-video-editor/internal/services"
 	"github.com/chandler-mayo/mcp-video-editor/internal/services/agent"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // Bridge is the Wails-specific transport layer
 // It exposes the service layer to the React frontend via Wails bindings
 type Bridge struct {
 	ctx      context.Context
+	app      *application.App
 	services *services.Services
 }
 
 // NewBridge creates a new Wails bridge
-func NewBridge(services *services.Services) *Bridge {
+func NewBridge(app *application.App, services *services.Services) *Bridge {
 	return &Bridge{
+		app:      app,
 		services: services,
 	}
 }
@@ -137,11 +140,39 @@ func (b *Bridge) UpdateConfig(updates map[string]interface{}) error {
 	return b.services.UpdateConfig(cfg)
 }
 
-// OpenFileBrowser opens the system file browser
+// OpenFileBrowser opens the system file browser for selecting video/audio files
 func (b *Bridge) OpenFileBrowser(fileTypes []string) ([]string, error) {
-	// TODO: Implement using Wails file dialog API when available
-	// For now, return empty to allow testing with browser file picker
-	return []string{}, nil
+	result, err := b.app.Dialog.OpenFile().
+		SetTitle("Select Video or Audio Files").
+		AddFilter("Video Files", "*.mp4;*.mov;*.avi;*.mkv;*.webm;*.flv;*.wmv;*.m4v").
+		AddFilter("Audio Files", "*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.wma").
+		AddFilter("All Supported Files", "*.mp4;*.mov;*.avi;*.mkv;*.webm;*.flv;*.wmv;*.m4v;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.wma").
+		CanChooseFiles(true).
+		CanChooseDirectories(false).
+		ShowHiddenFiles(false).
+		PromptForMultipleSelection()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file dialog: %w", err)
+	}
+
+	return result, nil
+}
+
+// OpenDirectoryBrowser opens the system file browser for selecting a directory
+func (b *Bridge) OpenDirectoryBrowser() (string, error) {
+	result, err := b.app.Dialog.OpenFile().
+		SetTitle("Select Directory").
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		ShowHiddenFiles(false).
+		PromptForSingleSelection()
+
+	if err != nil {
+		return "", fmt.Errorf("failed to open directory dialog: %w", err)
+	}
+
+	return result, nil
 }
 
 // GetFileInfo extracts metadata from a video file
