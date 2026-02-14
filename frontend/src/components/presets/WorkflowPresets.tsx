@@ -1,3 +1,5 @@
+import Tooltip from '../ui/Tooltip'
+
 interface Preset {
   id: string
   name: string
@@ -209,11 +211,11 @@ export default function WorkflowPresets({ onSelectPreset }: WorkflowPresetsProps
             {presets
               .filter((p) => p.category === category.id)
               .map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => onSelectPreset(preset)}
-                  className="text-left border border-border rounded-lg p-4 hover:shadow-lg hover:border-primary transition-all group"
-                >
+                <Tooltip content={`Click to start ${preset.name} workflow`} placement="top" key={preset.id}>
+                  <button
+                    onClick={() => onSelectPreset(preset)}
+                    className="text-left border border-border rounded-lg p-4 hover:shadow-lg hover:border-primary transition-all group"
+                  >
                   <div className="flex items-start space-x-3">
                     <div className="text-3xl group-hover:scale-110 transition-transform">
                       {preset.icon}
@@ -241,7 +243,8 @@ export default function WorkflowPresets({ onSelectPreset }: WorkflowPresetsProps
                       </div>
                     </div>
                   </div>
-                </button>
+                  </button>
+                </Tooltip>
               ))}
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Tooltip from '../ui/Tooltip'
 
 interface Operation {
   id: string
@@ -96,22 +97,24 @@ export default function Timeline({
       {/* Timeline Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <button
-            onClick={onUndo}
-            disabled={!canUndo}
-            className="px-3 py-1.5 text-sm border border-border rounded hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Undo (Cmd+Z)"
-          >
-            ↶ Undo
-          </button>
-          <button
-            onClick={onRedo}
-            disabled={!canRedo}
-            className="px-3 py-1.5 text-sm border border-border rounded hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Redo (Cmd+Shift+Z)"
-          >
-            ↷ Redo
-          </button>
+          <Tooltip content="Undo last operation (⌘+Z)">
+            <button
+              onClick={onUndo}
+              disabled={!canUndo}
+              className="px-3 py-1.5 text-sm border border-border rounded hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              ↶ Undo
+            </button>
+          </Tooltip>
+          <Tooltip content="Redo operation (⌘+⇧+Z)">
+            <button
+              onClick={onRedo}
+              disabled={!canRedo}
+              className="px-3 py-1.5 text-sm border border-border rounded hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              ↷ Redo
+            </button>
+          </Tooltip>
         </div>
 
         <div className="text-sm text-muted-foreground">
@@ -129,12 +132,13 @@ export default function Timeline({
             )}
 
             {/* Operation Card */}
-            <div
-              onClick={() => onOperationClick(op)}
-              className={`border-l-4 rounded-lg p-3 cursor-pointer hover:shadow-md transition-all ${getStatusColor(
-                op.status
-              )}`}
-            >
+            <Tooltip content="Click to view output in preview" placement="left">
+              <div
+                onClick={() => onOperationClick(op)}
+                className={`border-l-4 rounded-lg p-3 cursor-pointer hover:shadow-md transition-all ${getStatusColor(
+                  op.status
+                )}`}
+              >
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-3 flex-1">
                   <div className="text-2xl flex-shrink-0">
@@ -203,7 +207,8 @@ export default function Timeline({
                   )}
                 </div>
               </div>
-            </div>
+              </div>
+            </Tooltip>
           </div>
         ))}
       </div>

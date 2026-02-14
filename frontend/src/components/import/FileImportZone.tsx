@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import Tooltip from '../ui/Tooltip'
 
 interface FileImportZoneProps {
   onFilesAdded: (files: File[]) => void
@@ -76,18 +77,20 @@ export default function FileImportZone({ onFilesAdded }: FileImportZoneProps) {
         </div>
 
         <div>
-          <label className="inline-block cursor-pointer">
-            <input
-              type="file"
-              multiple
-              accept="video/*,audio/*,.mp4,.mov,.avi,.mkv,.webm,.mp3,.wav,.flac,.m4a"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <span className="px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium hover:opacity-90 transition-opacity inline-block">
-              Browse Files
-            </span>
-          </label>
+          <Tooltip content="Select video or audio files from your computer">
+            <label className="inline-block cursor-pointer">
+              <input
+                type="file"
+                multiple
+                accept="video/*,audio/*,.mp4,.mov,.avi,.mkv,.webm,.mp3,.wav,.flac,.m4a"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <span className="px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium hover:opacity-90 transition-opacity inline-block">
+                Browse Files
+              </span>
+            </label>
+          </Tooltip>
         </div>
 
         <p className="text-xs text-muted-foreground">

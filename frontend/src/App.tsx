@@ -9,6 +9,7 @@ import FileImportZone from './components/import/FileImportZone'
 import FileList from './components/import/FileList'
 import WorkflowPresets from './components/presets/WorkflowPresets'
 import RecentFilesList from './components/recent/RecentFilesList'
+import Tooltip from './components/ui/Tooltip'
 import { useKeyboardShortcuts, KeyboardShortcut } from './lib/hooks/useKeyboardShortcuts'
 import { useRecentFiles, RecentFile } from './lib/hooks/useRecentFiles'
 
@@ -191,71 +192,82 @@ function App() {
           <h1 className="text-xl font-bold text-primary">MCP Video Editor</h1>
 
           <nav className="flex space-x-1">
-            <button
-              onClick={() => setActiveView('chat')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                activeView === 'chat'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-secondary text-muted-foreground'
-              }`}
-            >
-              💬 Chat
-            </button>
-            <button
-              onClick={() => setActiveView('timeline')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                activeView === 'timeline'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-secondary text-muted-foreground'
-              }`}
-            >
-              📋 Timeline
-            </button>
-            <button
-              onClick={() => setActiveView('import')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                activeView === 'import'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-secondary text-muted-foreground'
-              }`}
-            >
-              📁 Files
-            </button>
-            <button
-              onClick={() => setActiveView('presets')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                activeView === 'presets'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-secondary text-muted-foreground'
-              }`}
-            >
-              ⚡ Presets
-            </button>
+            <Tooltip content="Chat with AI agent to edit videos (⌘+1)">
+              <button
+                onClick={() => setActiveView('chat')}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  activeView === 'chat'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-secondary text-muted-foreground'
+                }`}
+              >
+                💬 Chat
+              </button>
+            </Tooltip>
+            <Tooltip content="View operation history and timeline (⌘+2)">
+              <button
+                onClick={() => setActiveView('timeline')}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  activeView === 'timeline'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-secondary text-muted-foreground'
+                }`}
+              >
+                📋 Timeline
+              </button>
+            </Tooltip>
+            <Tooltip content="Import and manage video files (⌘+3)">
+              <button
+                onClick={() => setActiveView('import')}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  activeView === 'import'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-secondary text-muted-foreground'
+                }`}
+              >
+                📁 Files
+              </button>
+            </Tooltip>
+            <Tooltip content="Quick-start workflow templates (⌘+4)">
+              <button
+                onClick={() => setActiveView('presets')}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  activeView === 'presets'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-secondary text-muted-foreground'
+                }`}
+              >
+                ⚡ Presets
+              </button>
+            </Tooltip>
           </nav>
         </div>
 
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setIsHelpOpen(true)}
-            className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
-            title="Keyboard Shortcuts (? or F1)"
-          >
-            ⌨️
-          </button>
-          <button
-            onClick={() => setIsAboutOpen(true)}
-            className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
-            title="About"
-          >
-            ℹ️
-          </button>
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
-            title="Settings (⌘,)"
-          >
-            ⚙️ Settings
-          </button>
+          <Tooltip content="View keyboard shortcuts (? or F1)">
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              ⌨️
+            </button>
+          </Tooltip>
+          <Tooltip content="About this application">
+            <button
+              onClick={() => setIsAboutOpen(true)}
+              className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              ℹ️
+            </button>
+          </Tooltip>
+          <Tooltip content="Application settings (⌘,)">
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              ⚙️ Settings
+            </button>
+          </Tooltip>
         </div>
       </div>
 

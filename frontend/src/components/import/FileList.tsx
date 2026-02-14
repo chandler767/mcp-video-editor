@@ -1,3 +1,5 @@
+import Tooltip from '../ui/Tooltip'
+
 interface ImportedFile {
   id: string
   name: string
@@ -54,15 +56,15 @@ export default function FileList({
   return (
     <div className="space-y-2">
       {files.map((file) => (
-        <div
-          key={file.id}
-          onClick={() => onSelectFile(file.id)}
-          className={`border rounded-lg p-4 hover:bg-secondary/50 transition-colors cursor-pointer ${
-            selectedFileId === file.id
-              ? 'border-primary bg-primary/5'
-              : 'border-border'
-          }`}
-        >
+        <Tooltip content="Click to select and preview this file" placement="left" key={file.id}>
+          <div
+            onClick={() => onSelectFile(file.id)}
+            className={`border rounded-lg p-4 hover:bg-secondary/50 transition-colors cursor-pointer ${
+              selectedFileId === file.id
+                ? 'border-primary bg-primary/5'
+                : 'border-border'
+            }`}
+          >
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-3 flex-1 min-w-0">
               <div className="text-2xl flex-shrink-0">
@@ -88,18 +90,20 @@ export default function FileList({
               </div>
             </div>
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onRemoveFile(file.id)
-              }}
-              className="ml-2 flex-shrink-0 text-muted-foreground hover:text-red-500 transition-colors p-1"
-              title="Remove file"
-            >
-              ✕
-            </button>
+            <Tooltip content="Remove file from project">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRemoveFile(file.id)
+                }}
+                className="ml-2 flex-shrink-0 text-muted-foreground hover:text-red-500 transition-colors p-1"
+              >
+                ✕
+              </button>
+            </Tooltip>
           </div>
         </div>
+        </Tooltip>
       ))}
     </div>
   )

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import WorkspaceSettings from './WorkspaceSettings'
 import ProjectSettings from './ProjectSettings'
+import Tooltip from '../ui/Tooltip'
 
 interface SettingsDialogProps {
   isOpen: boolean
@@ -19,36 +20,42 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
         <div className="border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Settings</h2>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              ✕
-            </button>
+            <Tooltip content="Close settings (Esc)">
+              <button
+                onClick={onClose}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ✕
+              </button>
+            </Tooltip>
           </div>
 
           {/* Tabs */}
           <div className="flex space-x-4 mt-4">
-            <button
-              onClick={() => setActiveTab('workspace')}
-              className={`pb-2 px-1 border-b-2 transition-colors ${
-                activeTab === 'workspace'
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Workspace
-            </button>
-            <button
-              onClick={() => setActiveTab('project')}
-              className={`pb-2 px-1 border-b-2 transition-colors ${
-                activeTab === 'project'
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Project
-            </button>
+            <Tooltip content="Global settings for API keys and tools">
+              <button
+                onClick={() => setActiveTab('workspace')}
+                className={`pb-2 px-1 border-b-2 transition-colors ${
+                  activeTab === 'workspace'
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Workspace
+              </button>
+            </Tooltip>
+            <Tooltip content="Project-specific settings and preferences">
+              <button
+                onClick={() => setActiveTab('project')}
+                className={`pb-2 px-1 border-b-2 transition-colors ${
+                  activeTab === 'project'
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Project
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -60,18 +67,22 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
 
         {/* Footer */}
         <div className="border-t border-border px-6 py-4 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm border border-border rounded-md hover:bg-secondary transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
-          >
-            Save Changes
-          </button>
+          <Tooltip content="Close without saving changes">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              Cancel
+            </button>
+          </Tooltip>
+          <Tooltip content="Save settings and close dialog">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
+            >
+              Save Changes
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>
