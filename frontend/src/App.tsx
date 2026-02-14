@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ChatDialog from './components/chat/ChatDialog'
 import SettingsDialog from './components/settings/SettingsDialog'
 import AboutDialog from './components/about/AboutDialog'
@@ -9,11 +9,13 @@ import FileImportZone from './components/import/FileImportZone'
 import FileList from './components/import/FileList'
 import WorkflowPresets from './components/presets/WorkflowPresets'
 import RecentFilesList from './components/recent/RecentFilesList'
+import LogsViewer from './components/logs/LogsViewer'
 import Tooltip from './components/ui/Tooltip'
 import { useKeyboardShortcuts, KeyboardShortcut } from './lib/hooks/useKeyboardShortcuts'
 import { useRecentFiles, RecentFile } from './lib/hooks/useRecentFiles'
+import { logger } from './lib/hooks/useLogs'
 
-type View = 'chat' | 'timeline' | 'import' | 'presets'
+type View = 'chat' | 'timeline' | 'import' | 'presets' | 'logs'
 
 interface ImportedFile {
   id: string
@@ -47,6 +49,11 @@ function App() {
   const [operations] = useState<Operation[]>([])
   const [currentVideoPath, setCurrentVideoPath] = useState<string>()
 
+  // Log app initialization
+  useEffect(() => {
+    logger.info('MCP Video Editor started', 'App', { version: '1.0.0' })
+  }, [])
+
   // Define keyboard shortcuts
   const shortcuts: KeyboardShortcut[] = [
     {
@@ -72,6 +79,12 @@ function App() {
       metaKey: true,
       description: 'Switch to Presets view',
       action: () => setActiveView('presets'),
+    },
+    {
+      key: '5',
+      metaKey: true,
+      description: 'Switch to Logs view',
+      action: () => setActiveView('logs'),
     },
     {
       key: ',',
@@ -240,6 +253,18 @@ function App() {
                 ⚡ Presets
               </button>
             </Tooltip>
+            <Tooltip content="View application logs for debugging (⌘+5)">
+              <button
+                onClick={() => setActiveView('logs')}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  activeView === 'logs'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-secondary text-muted-foreground'
+                }`}
+              >
+                📋 Logs
+              </button>
+            </Tooltip>
           </nav>
         </div>
 
@@ -323,6 +348,10 @@ function App() {
             <div className="h-full overflow-y-auto p-6">
               <WorkflowPresets onSelectPreset={handlePresetSelect} />
             </div>
+          )}
+
+          {activeView === 'logs' && (
+            <LogsViewer />
           )}
         </div>
 

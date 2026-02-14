@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { BridgeService, isWailsEnvironment } from '../../lib/wails'
+import { logger } from '../../lib/hooks/useLogs'
 
 interface Message {
   role: string
@@ -39,12 +40,15 @@ export default function ChatDialog() {
       content: input.trim(),
     }
 
+    logger.info(`User message: ${userMessage.content}`, 'ChatDialog')
+
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
 
     try {
       // Call Wails backend
+      logger.debug('Sending message to agent...', 'ChatDialog')
       const stream = await BridgeService.sendMessage(userMessage.content)
       const reader = stream.getReader()
 
@@ -72,6 +76,11 @@ export default function ChatDialog() {
             assistantMessage.toolCalls = []
           }
           assistantMessage.toolCalls.push(...value.toolCalls)
+
+          // Log tool calls
+          value.toolCalls.forEach((toolCall: any) => {
+            logger.info(`Tool call: ${toolCall.name}`, 'Agent', toolCall.args)
+          })
         }
 
         if (value.toolResults && value.toolResults.length > 0) {
@@ -79,10 +88,20 @@ export default function ChatDialog() {
             assistantMessage.toolResults = []
           }
           assistantMessage.toolResults.push(...value.toolResults)
+
+          // Log tool results
+          value.toolResults.forEach((result: any) => {
+            if (result.success) {
+              logger.info(`Tool result: Success`, 'Agent', result.content)
+            } else {
+              logger.error(`Tool result: Error`, 'Agent', result.error)
+            }
+          })
         }
 
         if (value.error) {
           assistantMessage.content += `\n\nError: ${value.error}`
+          logger.error(`Agent error: ${value.error}`, 'ChatDialog')
         }
 
         // Update UI
@@ -98,9 +117,15 @@ export default function ChatDialog() {
         }
       }
 
+      logger.debug('Agent stream completed', 'ChatDialog')
       setIsLoading(false)
     } catch (error) {
       console.error('Error sending message:', error)
+      logger.error(
+        `Error sending message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'ChatDialog',
+        error
+      )
       const errorMessage: Message = {
         role: 'assistant',
         content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
@@ -134,6 +159,7 @@ export default function ChatDialog() {
           {messages.length > 0 && (
             <button
               onClick={() => {
+                logger.info('Clearing conversation', 'ChatDialog')
                 setMessages([])
                 BridgeService.clearConversation()
               }}
