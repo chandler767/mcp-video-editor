@@ -10,9 +10,11 @@ import FileList from './components/import/FileList'
 import WorkflowPresets from './components/presets/WorkflowPresets'
 import RecentFilesList from './components/recent/RecentFilesList'
 import LogsViewer from './components/logs/LogsViewer'
+import ProjectManager from './components/project/ProjectManager'
 import Tooltip from './components/ui/Tooltip'
 import { useKeyboardShortcuts, KeyboardShortcut } from './lib/hooks/useKeyboardShortcuts'
 import { useRecentFiles, RecentFile } from './lib/hooks/useRecentFiles'
+import { useProject, ProjectState } from './lib/hooks/useProject'
 import { logger } from './lib/hooks/useLogs'
 
 type View = 'chat' | 'timeline' | 'import' | 'presets' | 'logs'
@@ -44,15 +46,73 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isAboutOpen, setIsAboutOpen] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
+  const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false)
   const [importedFiles, setImportedFiles] = useState<ImportedFile[]>([])
   const [selectedFileId, setSelectedFileId] = useState<string>()
   const [operations] = useState<Operation[]>([])
   const [currentVideoPath, setCurrentVideoPath] = useState<string>()
 
+  // Project management
+  const { currentProject, updateProjectFiles, updateProjectOperations } = useProject()
+
   // Log app initialization
   useEffect(() => {
     logger.info('MCP Video Editor started', 'App', { version: '1.0.0' })
   }, [])
+
+  // Load project data into app state
+  const handleProjectLoad = (project: ProjectState) => {
+    logger.info(`Loading project into app: ${project.name}`, 'App')
+
+    // Load files
+    if (project.files) {
+      const files = project.files.map((f) => ({
+        id: f.id,
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        duration: f.duration,
+        resolution: f.resolution,
+        path: f.path,
+      }))
+      setImportedFiles(files)
+    }
+
+    // Load selected file
+    if (project.selectedFileId) {
+      setSelectedFileId(project.selectedFileId)
+    }
+
+    // Load current video path
+    if (project.currentVideoPath) {
+      setCurrentVideoPath(project.currentVideoPath)
+    }
+
+    logger.info('Project loaded into app state', 'App')
+  }
+
+  // Auto-save project when files or operations change
+  useEffect(() => {
+    if (currentProject && importedFiles.length > 0) {
+      const projectFiles = importedFiles.map((f) => ({
+        id: f.id,
+        name: f.name,
+        path: f.path || '',
+        size: f.size,
+        type: f.type,
+        duration: f.duration,
+        resolution: f.resolution,
+        addedAt: Date.now(),
+      }))
+      updateProjectFiles(projectFiles)
+    }
+  }, [importedFiles, currentProject, updateProjectFiles])
+
+  useEffect(() => {
+    if (currentProject && operations.length > 0) {
+      updateProjectOperations(operations)
+    }
+  }, [operations, currentProject, updateProjectOperations])
 
   // Define keyboard shortcuts
   const shortcuts: KeyboardShortcut[] = [
@@ -87,6 +147,12 @@ function App() {
       action: () => setActiveView('logs'),
     },
     {
+      key: 'p',
+      metaKey: true,
+      description: 'Open project manager',
+      action: () => setIsProjectManagerOpen(true),
+    },
+    {
       key: ',',
       metaKey: true,
       description: 'Open settings',
@@ -111,6 +177,7 @@ function App() {
         setIsSettingsOpen(false)
         setIsAboutOpen(false)
         setIsHelpOpen(false)
+        setIsProjectManagerOpen(false)
       },
       preventDefault: false,
     },
@@ -269,6 +336,20 @@ function App() {
         </div>
 
         <div className="flex items-center space-x-2">
+          {currentProject && (
+            <div className="px-3 py-1.5 bg-primary/10 border border-primary/30 rounded-md text-sm">
+              <span className="text-muted-foreground">Project:</span>
+              <span className="ml-1 font-medium text-primary">{currentProject.name}</span>
+            </div>
+          )}
+          <Tooltip content="Project manager (⌘+P)">
+            <button
+              onClick={() => setIsProjectManagerOpen(true)}
+              className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            >
+              📁 Projects
+            </button>
+          </Tooltip>
           <Tooltip content="View keyboard shortcuts (? or F1)">
             <button
               onClick={() => setIsHelpOpen(true)}
@@ -399,6 +480,13 @@ function App() {
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
         shortcuts={shortcuts}
+      />
+
+      {/* Project Manager */}
+      <ProjectManager
+        isOpen={isProjectManagerOpen}
+        onClose={() => setIsProjectManagerOpen(false)}
+        onProjectLoad={handleProjectLoad}
       />
     </div>
   )
