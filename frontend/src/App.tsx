@@ -8,7 +8,9 @@ import VideoPreview from './components/video/VideoPreview'
 import FileImportZone from './components/import/FileImportZone'
 import FileList from './components/import/FileList'
 import WorkflowPresets from './components/presets/WorkflowPresets'
+import RecentFilesList from './components/recent/RecentFilesList'
 import { useKeyboardShortcuts, KeyboardShortcut } from './lib/hooks/useKeyboardShortcuts'
+import { useRecentFiles, RecentFile } from './lib/hooks/useRecentFiles'
 
 type View = 'chat' | 'timeline' | 'import' | 'presets'
 
@@ -103,6 +105,9 @@ function App() {
   // Enable keyboard shortcuts
   useKeyboardShortcuts(shortcuts)
 
+  // Recent files management
+  const { recentFiles, addRecentFile, removeRecentFile, clearRecentFiles } = useRecentFiles()
+
   const handleFilesAdded = (files: File[]) => {
     const newFiles: ImportedFile[] = files.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
@@ -115,6 +120,17 @@ function App() {
       path: URL.createObjectURL(file),
     }))
     setImportedFiles((prev) => [...prev, ...newFiles])
+
+    // Add to recent files
+    newFiles.forEach((file) => {
+      addRecentFile({
+        id: file.id,
+        name: file.name,
+        path: file.path!,
+        size: file.size,
+        type: file.type,
+      })
+    })
   }
 
   const handleRemoveFile = (id: string) => {
@@ -145,6 +161,26 @@ function App() {
     console.log('Selected preset:', preset)
     // Could integrate with chat to send a message like:
     // "Execute the ${preset.name} workflow"
+  }
+
+  const handleRecentFileSelect = (file: RecentFile) => {
+    // Check if file is already imported
+    const existing = importedFiles.find((f) => f.path === file.path)
+    if (existing) {
+      handleSelectFile(existing.id)
+    } else {
+      // Add to imported files
+      const importedFile: ImportedFile = {
+        id: file.id,
+        name: file.name,
+        size: file.size || 0,
+        type: file.type || '',
+        path: file.path,
+      }
+      setImportedFiles((prev) => [...prev, importedFile])
+      setSelectedFileId(file.id)
+      setCurrentVideoPath(file.path)
+    }
   }
 
   return (
@@ -247,6 +283,7 @@ function App() {
           {activeView === 'import' && (
             <div className="h-full overflow-y-auto p-6 space-y-6">
               <FileImportZone onFilesAdded={handleFilesAdded} />
+
               <div>
                 <h3 className="text-lg font-semibold mb-4">
                   Imported Files ({importedFiles.length})
@@ -256,6 +293,15 @@ function App() {
                   onRemoveFile={handleRemoveFile}
                   onSelectFile={handleSelectFile}
                   selectedFileId={selectedFileId}
+                />
+              </div>
+
+              <div className="border-t border-border pt-6">
+                <RecentFilesList
+                  files={recentFiles}
+                  onSelectFile={handleRecentFileSelect}
+                  onRemoveFile={removeRecentFile}
+                  onClearAll={clearRecentFiles}
                 />
               </div>
             </div>
