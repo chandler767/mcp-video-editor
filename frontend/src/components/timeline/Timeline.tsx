@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Tooltip from '../ui/Tooltip'
+import OperationEditDialog from './OperationEditDialog'
 
 interface Operation {
   id: string
@@ -20,6 +21,8 @@ interface TimelineProps {
   onRedo?: () => void
   canUndo?: boolean
   canRedo?: boolean
+  onEditOperation?: (operationId: string, newParameters: Record<string, any>) => Promise<void>
+  onDeleteOperation?: (operationId: string) => void
 }
 
 export default function Timeline({
@@ -29,8 +32,11 @@ export default function Timeline({
   onRedo,
   canUndo = false,
   canRedo = false,
+  onEditOperation,
+  onDeleteOperation,
 }: TimelineProps) {
   const [expandedOps, setExpandedOps] = useState<Set<string>>(new Set())
+  const [editingOperation, setEditingOperation] = useState<Operation | null>(null)
 
   const toggleExpanded = (opId: string) => {
     setExpandedOps((prev) => {
@@ -191,6 +197,19 @@ export default function Timeline({
                         </pre>
                       </div>
                     )}
+
+                    {/* Edit Button */}
+                    {onEditOperation && op.parameters && Object.keys(op.parameters).length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingOperation(op)
+                        }}
+                        className="mt-2 text-xs px-3 py-1 border border-primary text-primary rounded hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        ✏️ Edit Parameters
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -212,6 +231,17 @@ export default function Timeline({
           </div>
         ))}
       </div>
+
+      {/* Operation Edit Dialog */}
+      {onEditOperation && onDeleteOperation && (
+        <OperationEditDialog
+          isOpen={editingOperation !== null}
+          operation={editingOperation}
+          onClose={() => setEditingOperation(null)}
+          onSave={onEditOperation}
+          onDelete={onDeleteOperation}
+        />
+      )}
     </div>
   )
 }
