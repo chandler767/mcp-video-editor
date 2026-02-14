@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { BridgeService, isWailsEnvironment } from '../../lib/wails'
 
 interface Message {
   role: string
@@ -43,20 +44,72 @@ export default function ChatDialog() {
     setIsLoading(true)
 
     try {
-      // TODO: Call Wails backend
-      // const response = await SendMessage(input.trim())
+      // Call Wails backend
+      const stream = await BridgeService.sendMessage(userMessage.content)
+      const reader = stream.getReader()
 
-      // For now, mock response
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: `I received your message: "${userMessage.content}"\n\nThe Wails backend integration is pending. Once connected, I'll be able to execute video editing operations using the 70+ MCP tools available.`,
+      let assistantMessage: Message = {
+        role: 'assistant',
+        content: '',
+      }
+
+      // Add initial empty message
+      setMessages(prev => [...prev, assistantMessage])
+
+      // Read stream
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) break
+
+        // Update message based on response type
+        if (value.type === 'content') {
+          assistantMessage.content += value.content
+          setMessages(prev => {
+            const newMessages = [...prev]
+            newMessages[newMessages.length - 1] = { ...assistantMessage }
+            return newMessages
+          })
+        } else if (value.type === 'tool_call') {
+          if (!assistantMessage.toolCalls) {
+            assistantMessage.toolCalls = []
+          }
+          assistantMessage.toolCalls.push({
+            id: value.id,
+            name: value.name,
+            args: value.arguments || {}
+          })
+          setMessages(prev => {
+            const newMessages = [...prev]
+            newMessages[newMessages.length - 1] = { ...assistantMessage }
+            return newMessages
+          })
+        } else if (value.type === 'tool_result') {
+          if (!assistantMessage.toolResults) {
+            assistantMessage.toolResults = []
+          }
+          assistantMessage.toolResults.push({
+            toolCallId: value.id,
+            success: value.success,
+            content: value.content,
+            error: value.error
+          })
+          setMessages(prev => {
+            const newMessages = [...prev]
+            newMessages[newMessages.length - 1] = { ...assistantMessage }
+            return newMessages
+          })
         }
-        setMessages(prev => [...prev, assistantMessage])
-        setIsLoading(false)
-      }, 500)
+      }
+
+      setIsLoading(false)
     } catch (error) {
       console.error('Error sending message:', error)
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+      }
+      setMessages(prev => [...prev, errorMessage])
       setIsLoading(false)
     }
   }
@@ -72,8 +125,28 @@ export default function ChatDialog() {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border px-6 py-4">
-        <h1 className="text-2xl font-bold text-primary">MCP Video Editor</h1>
-        <p className="text-sm text-muted-foreground">AI-Powered Video Editing Assistant</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-primary">MCP Video Editor</h1>
+            <p className="text-sm text-muted-foreground">
+              AI-Powered Video Editing Assistant
+              {!isWailsEnvironment() && (
+                <span className="ml-2 text-yellow-600 font-semibold">(Development Mode)</span>
+              )}
+            </p>
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                setMessages([])
+                BridgeService.clearConversation()
+              }}
+              className="px-4 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:opacity-90 transition-opacity"
+            >
+              Clear Chat
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
