@@ -10,4 +10,6 @@ require (
 	github.com/sashabaranov/go-openai v1.41.2
 )
 
-require github.com/google/uuid v1.6.0 // indirect
+require github.com/google/uuid v1.6.0
+
+require github.com/haguro/elevenlabs-go v0.2.4

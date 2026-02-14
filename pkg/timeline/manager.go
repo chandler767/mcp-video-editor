@@ -448,9 +448,10 @@ func (m *Manager) GetStatistics(timelineID string) (map[string]interface{}, erro
 	operationsByType := make(map[string]int)
 
 	for _, op := range timeline.Operations {
-		if op.Status == "completed" {
+		switch op.Status {
+		case "completed":
 			stats["completedOperations"] = stats["completedOperations"].(int) + 1
-		} else if op.Status == "failed" {
+		case "failed":
 			stats["failedOperations"] = stats["failedOperations"].(int) + 1
 		}
 

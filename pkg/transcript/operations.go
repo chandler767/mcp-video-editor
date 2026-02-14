@@ -237,6 +237,9 @@ func (o *Operations) transcribeFile(ctx context.Context, audioPath, language str
 		Model:    openai.Whisper1,
 		FilePath: audioPath,
 		Format:   openai.AudioResponseFormatVerboseJSON,
+		TimestampGranularities: []openai.TranscriptionTimestampGranularity{
+			openai.TranscriptionTimestampGranularityWord,
+		},
 	}
 
 	if language != "" {
@@ -257,8 +260,23 @@ func (o *Operations) transcribeFile(ctx context.Context, audioPath, language str
 			End:   float64(seg.End),
 		}
 
-		// Note: go-openai may not return word-level timing by default
-		// We'll use segment-level timing for now
+		// Parse word-level timestamps from response.Words
+		// Words are at the top level, so we need to match them to segments by timing
+		if len(resp.Words) > 0 {
+			var segmentWords []Word
+			for _, word := range resp.Words {
+				// Check if word falls within this segment's time range
+				if word.Start >= seg.Start && word.End <= seg.End {
+					segmentWords = append(segmentWords, Word{
+						Word:  word.Word,
+						Start: word.Start,
+						End:   word.End,
+					})
+				}
+			}
+			segment.Words = segmentWords
+		}
+
 		segments[i] = segment
 	}
 

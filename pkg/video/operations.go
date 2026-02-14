@@ -22,6 +22,11 @@ func NewOperations(mgr *ffmpeg.Manager) *Operations {
 	return &Operations{ffmpeg: mgr}
 }
 
+// GetFFmpegManager returns the underlying FFmpeg manager
+func (o *Operations) GetFFmpegManager() *ffmpeg.Manager {
+	return o.ffmpeg
+}
+
 // VideoInfo contains metadata about a video file
 type VideoInfo struct {
 	Format      string  `json:"format"`
@@ -94,7 +99,8 @@ func (o *Operations) GetVideoInfo(ctx context.Context, filePath string) (*VideoI
 
 	// Find video and audio streams
 	for _, stream := range probeData.Streams {
-		if stream.CodecType == "video" {
+		switch stream.CodecType {
+		case "video":
 			info.Width = stream.Width
 			info.Height = stream.Height
 			info.VideoCodec = stream.CodecName
@@ -111,7 +117,7 @@ func (o *Operations) GetVideoInfo(ctx context.Context, filePath string) (*VideoI
 					}
 				}
 			}
-		} else if stream.CodecType == "audio" {
+		case "audio":
 			info.AudioCodec = stream.CodecName
 			info.HasAudio = true
 		}

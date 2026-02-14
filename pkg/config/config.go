@@ -8,11 +8,13 @@ import (
 
 // Config holds all configuration for the MCP video editor
 type Config struct {
-	OpenAIKey      string `json:"openaiApiKey"`
-	FFmpegPath     string `json:"ffmpegPath,omitempty"`
-	FFprobePath    string `json:"ffprobePath,omitempty"`
-	DefaultQuality string `json:"defaultQuality,omitempty"`
-	TempDir        string `json:"tempDir,omitempty"`
+	OpenAIKey        string            `json:"openaiApiKey"`
+	ElevenLabsKey    string            `json:"elevenLabsApiKey,omitempty"`
+	ElevenLabsVoices map[string]string `json:"elevenLabsVoices,omitempty"`
+	FFmpegPath       string            `json:"ffmpegPath,omitempty"`
+	FFprobePath      string            `json:"ffprobePath,omitempty"`
+	DefaultQuality   string            `json:"defaultQuality,omitempty"`
+	TempDir          string            `json:"tempDir,omitempty"`
 }
 
 // Load reads configuration from ~/.mcp-video-config.json
@@ -37,6 +39,9 @@ func Load() (*Config, error) {
 	// Override with environment variables if set
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
 		cfg.OpenAIKey = key
+	}
+	if key := os.Getenv("ELEVENLABS_API_KEY"); key != "" {
+		cfg.ElevenLabsKey = key
 	}
 	if path := os.Getenv("FFMPEG_PATH"); path != "" {
 		cfg.FFmpegPath = path
@@ -72,6 +77,10 @@ func (c *Config) Update(updates map[string]interface{}) error {
 			if v, ok := value.(string); ok {
 				c.OpenAIKey = v
 			}
+		case "elevenLabsKey", "elevenLabsApiKey":
+			if v, ok := value.(string); ok {
+				c.ElevenLabsKey = v
+			}
 		case "ffmpegPath":
 			if v, ok := value.(string); ok {
 				c.FFmpegPath = v
@@ -96,6 +105,8 @@ func (c *Config) Update(updates map[string]interface{}) error {
 // Reset resets configuration to defaults
 func (c *Config) Reset() error {
 	c.OpenAIKey = ""
+	c.ElevenLabsKey = ""
+	c.ElevenLabsVoices = nil
 	c.FFmpegPath = ""
 	c.FFprobePath = ""
 	c.DefaultQuality = "high"
@@ -106,11 +117,13 @@ func (c *Config) Reset() error {
 // ToMap converts config to map for JSON output
 func (c *Config) ToMap() map[string]interface{} {
 	return map[string]interface{}{
-		"openaiKey":      maskAPIKey(c.OpenAIKey),
-		"ffmpegPath":     c.FFmpegPath,
-		"ffprobePath":    c.FFprobePath,
-		"defaultQuality": c.DefaultQuality,
-		"tempDir":        c.TempDir,
+		"openaiKey":        maskAPIKey(c.OpenAIKey),
+		"elevenLabsKey":    maskAPIKey(c.ElevenLabsKey),
+		"elevenLabsVoices": c.ElevenLabsVoices,
+		"ffmpegPath":       c.FFmpegPath,
+		"ffprobePath":      c.FFprobePath,
+		"defaultQuality":   c.DefaultQuality,
+		"tempDir":          c.TempDir,
 	}
 }
 

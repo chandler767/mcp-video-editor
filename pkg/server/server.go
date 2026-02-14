@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/chandler-mayo/mcp-video-editor/pkg/audio"
 	"github.com/chandler-mayo/mcp-video-editor/pkg/config"
 	"github.com/chandler-mayo/mcp-video-editor/pkg/diagrams"
 	"github.com/chandler-mayo/mcp-video-editor/pkg/elements"
@@ -21,20 +22,23 @@ import (
 
 // MCPServer wraps the MCP server with video editing capabilities
 type MCPServer struct {
-	server         *server.MCPServer
-	config         *config.Config
-	ffmpeg         *ffmpeg.Manager
-	videoOps       *video.Operations
-	textOps        *text.Operations
-	visualFx       *visual.Effects
-	composite      *visual.Composite
-	transitions    *visual.Transitions
-	elements       *elements.Operations
-	transcriptOps  *transcript.Operations
-	timeline       *timeline.Manager
-	multitake      *multitake.Manager
-	visionAnalyzer *vision.Analyzer
-	diagramGen     *diagrams.Generator
+	server           *server.MCPServer
+	config           *config.Config
+	ffmpeg           *ffmpeg.Manager
+	videoOps         *video.Operations
+	textOps          *text.Operations
+	visualFx         *visual.Effects
+	composite        *visual.Composite
+	transitions      *visual.Transitions
+	elements         *elements.Operations
+	transcriptOps    *transcript.Operations
+	timeline         *timeline.Manager
+	multitake        *multitake.Manager
+	visionAnalyzer   *vision.Analyzer
+	diagramGen       *diagrams.Generator
+	ttsOps           *audio.TTSOperations
+	audioReplacement *audio.ReplacementOperations
+	audioOps         *audio.Operations
 }
 
 // NewMCPServer creates a new MCP server instance
@@ -58,6 +62,12 @@ func NewMCPServer(cfg *config.Config) (*MCPServer, error) {
 	visionAnalyzer := vision.NewAnalyzer(cfg.OpenAIKey, videoOps, ffmpegMgr)
 	diagramGen := diagrams.NewGenerator()
 
+	// Create audio operations
+	ttsOps := audio.NewTTSOperations(cfg.ElevenLabsKey, cfg)
+	spliceOps := audio.NewSpliceOperations(ffmpegMgr)
+	audioReplacement := audio.NewReplacementOperations(ttsOps, spliceOps, transcriptOps, videoOps)
+	audioOps := audio.NewOperations(ffmpegMgr)
+
 	// Create MCP server
 	s := server.NewMCPServer(
 		"mcp-video-editor",
@@ -65,20 +75,23 @@ func NewMCPServer(cfg *config.Config) (*MCPServer, error) {
 	)
 
 	srv := &MCPServer{
-		server:         s,
-		config:         cfg,
-		ffmpeg:         ffmpegMgr,
-		videoOps:       videoOps,
-		textOps:        textOps,
-		visualFx:       visualFx,
-		composite:      composite,
-		transitions:    transitions,
-		elements:       elementsOps,
-		transcriptOps:  transcriptOps,
-		timeline:       timelineMgr,
-		multitake:      multitakeMgr,
-		visionAnalyzer: visionAnalyzer,
-		diagramGen:     diagramGen,
+		server:           s,
+		config:           cfg,
+		ffmpeg:           ffmpegMgr,
+		videoOps:         videoOps,
+		textOps:          textOps,
+		visualFx:         visualFx,
+		composite:        composite,
+		transitions:      transitions,
+		elements:         elementsOps,
+		transcriptOps:    transcriptOps,
+		timeline:         timelineMgr,
+		multitake:        multitakeMgr,
+		visionAnalyzer:   visionAnalyzer,
+		diagramGen:       diagramGen,
+		ttsOps:           ttsOps,
+		audioReplacement: audioReplacement,
+		audioOps:         audioOps,
 	}
 
 	// Register all tools
@@ -132,6 +145,31 @@ func (s *MCPServer) registerTools() {
 
 	// Additional audio operations
 	s.registerGetAudioStats()
+
+	// Audio editing operations
+	s.registerTrimAudio()
+	s.registerConcatenateAudio()
+	s.registerAdjustAudioVolume()
+	s.registerNormalizeAudio()
+	s.registerFadeAudio()
+	s.registerMixAudio()
+	s.registerConvertAudio()
+	s.registerAdjustAudioSpeed()
+	s.registerRemoveAudioSection()
+	s.registerSplitAudio()
+	s.registerReverseAudio()
+	s.registerExtractAudioChannel()
+
+	// Audio word replacement
+	s.registerReplaceSpokenWord()
+	s.registerCloneVoiceFromAudio()
+	s.registerGenerateSpeech()
+	s.registerGetWordTimestamps()
+
+	// Voice management
+	s.registerListCachedVoices()
+	s.registerClearCachedVoice()
+	s.registerClearAllCachedVoices()
 
 	// Config management
 	s.registerGetConfig()

@@ -326,7 +326,7 @@ func (o *Operations) buildSubtitlesFilter(opts SubtitleOptions) string {
 		styleParams = append(styleParams, fmt.Sprintf("PrimaryColour=%s", opts.FontColor))
 	}
 	if opts.BorderWidth > 0 {
-		styleParams = append(styleParams, fmt.Sprintf("BorderStyle=1"))
+		styleParams = append(styleParams, "BorderStyle=1")
 		styleParams = append(styleParams, fmt.Sprintf("Outline=%d", opts.BorderWidth))
 	}
 
