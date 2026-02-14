@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ChatDialog from './components/chat/ChatDialog'
 import SettingsDialog from './components/settings/SettingsDialog'
+import AboutDialog from './components/about/AboutDialog'
 import Timeline from './components/timeline/Timeline'
 import VideoPreview from './components/video/VideoPreview'
 import FileImportZone from './components/import/FileImportZone'
@@ -34,6 +35,7 @@ interface Operation {
 function App() {
   const [activeView, setActiveView] = useState<View>('chat')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isAboutOpen, setIsAboutOpen] = useState(false)
   const [importedFiles, setImportedFiles] = useState<ImportedFile[]>([])
   const [selectedFileId, setSelectedFileId] = useState<string>()
   const [operations] = useState<Operation[]>([])
@@ -134,12 +136,21 @@ function App() {
           </nav>
         </div>
 
-        <button
-          onClick={() => setIsSettingsOpen(true)}
-          className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
-        >
-          ⚙️ Settings
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsAboutOpen(true)}
+            className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+            title="About"
+          >
+            ℹ️
+          </button>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+          >
+            ⚙️ Settings
+          </button>
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -218,6 +229,12 @@ function App() {
       <SettingsDialog
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* About Dialog */}
+      <AboutDialog
+        isOpen={isAboutOpen}
+        onClose={() => setIsAboutOpen(false)}
       />
     </div>
   )
