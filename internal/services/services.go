@@ -107,3 +107,51 @@ func (s *Services) GetConversationHistory() agent.ConversationHistory {
 func (s *Services) ClearConversation() {
 	s.agent.ClearConversation()
 }
+
+// ExecuteTool executes an MCP tool directly
+func (s *Services) ExecuteTool(ctx context.Context, name string, args map[string]interface{}) (*server.ToolResult, error) {
+	return s.mcpServer.ExecuteToolDirect(name, args)
+}
+
+// GetTools returns all available MCP tools as serializable maps
+func (s *Services) GetTools() []map[string]interface{} {
+	// Get tool definitions from MCP server
+	mcpTools := s.mcpServer.GetToolDefinitions()
+
+	// Convert to serializable maps for JSON transmission
+	tools := make([]map[string]interface{}, len(mcpTools))
+	for i, tool := range mcpTools {
+		tools[i] = map[string]interface{}{
+			"name":        tool.Name,
+			"description": tool.Description,
+			"inputSchema": tool.InputSchema,
+		}
+	}
+
+	return tools
+}
+
+// GetConfig returns the current configuration
+func (s *Services) GetConfig() *config.Config {
+	return s.config
+}
+
+// UpdateConfig updates the configuration
+func (s *Services) UpdateConfig(cfg *config.Config) error {
+	s.config = cfg
+
+	// Recreate agent with new config if provider/key changed
+	agentConfig := agent.AgentConfig{
+		Provider: getAgentProvider(cfg),
+		Model:    getAgentModel(cfg),
+		APIKey:   getAgentAPIKey(cfg),
+	}
+
+	orchestrator, err := agent.NewOrchestrator(agentConfig, s.mcpServer)
+	if err != nil {
+		return fmt.Errorf("failed to recreate agent: %w", err)
+	}
+
+	s.agent = orchestrator
+	return nil
+}

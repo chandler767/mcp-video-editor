@@ -65,6 +65,7 @@ export function emitToBackend(event: string, ...args: any[]): void {
 export const BridgeService = {
   /**
    * Send message to AI agent
+   * Returns array of response chunks (streaming not supported over Wails bridge)
    */
   async sendMessage(message: string): Promise<ReadableStream<any>> {
     if (!isWailsEnvironment()) {
@@ -72,20 +73,18 @@ export const BridgeService = {
       return createMockStream(message);
     }
 
-    // Call Go backend
-    const channel = await callBackend<string>('Bridge.SendMessage', message);
+    // Call Go backend - returns all responses as array
+    const responses = await callBackend<any[]>('Bridge.SendMessage', message);
 
-    // Convert Go channel to ReadableStream
+    // Convert array to ReadableStream for consistent interface
     return new ReadableStream({
       start(controller) {
-        const unsubscribe = onBackendEvent(`message-${channel}`, (data: any) => {
-          controller.enqueue(data);
-
-          if (data.done) {
-            controller.close();
-            unsubscribe();
-          }
-        });
+        // Emit each response
+        for (const resp of responses) {
+          controller.enqueue(resp);
+        }
+        // Close stream
+        controller.close();
       }
     });
   },

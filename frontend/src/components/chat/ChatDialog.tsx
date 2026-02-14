@@ -56,49 +56,45 @@ export default function ChatDialog() {
       // Add initial empty message
       setMessages(prev => [...prev, assistantMessage])
 
-      // Read stream
+      // Read stream (response format: {content, toolCalls, toolResults, done, error})
       while (true) {
         const { done, value } = await reader.read()
 
         if (done) break
 
-        // Update message based on response type
-        if (value.type === 'content') {
+        // Handle response from backend
+        if (value.content) {
           assistantMessage.content += value.content
-          setMessages(prev => {
-            const newMessages = [...prev]
-            newMessages[newMessages.length - 1] = { ...assistantMessage }
-            return newMessages
-          })
-        } else if (value.type === 'tool_call') {
+        }
+
+        if (value.toolCalls && value.toolCalls.length > 0) {
           if (!assistantMessage.toolCalls) {
             assistantMessage.toolCalls = []
           }
-          assistantMessage.toolCalls.push({
-            id: value.id,
-            name: value.name,
-            args: value.arguments || {}
-          })
-          setMessages(prev => {
-            const newMessages = [...prev]
-            newMessages[newMessages.length - 1] = { ...assistantMessage }
-            return newMessages
-          })
-        } else if (value.type === 'tool_result') {
+          assistantMessage.toolCalls.push(...value.toolCalls)
+        }
+
+        if (value.toolResults && value.toolResults.length > 0) {
           if (!assistantMessage.toolResults) {
             assistantMessage.toolResults = []
           }
-          assistantMessage.toolResults.push({
-            toolCallId: value.id,
-            success: value.success,
-            content: value.content,
-            error: value.error
-          })
-          setMessages(prev => {
-            const newMessages = [...prev]
-            newMessages[newMessages.length - 1] = { ...assistantMessage }
-            return newMessages
-          })
+          assistantMessage.toolResults.push(...value.toolResults)
+        }
+
+        if (value.error) {
+          assistantMessage.content += `\n\nError: ${value.error}`
+        }
+
+        // Update UI
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[newMessages.length - 1] = { ...assistantMessage }
+          return newMessages
+        })
+
+        // Check if done
+        if (value.done) {
+          break
         }
       }
 
