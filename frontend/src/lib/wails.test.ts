@@ -77,7 +77,7 @@ describe('wails', () => {
 
       it('calls backend and returns stream when in Wails environment', async () => {
         const mockCall = vi.fn().mockResolvedValue('channel-id')
-        const mockEventsOn = vi.fn().mockImplementation((event, callback) => {
+        const mockEventsOn = vi.fn().mockImplementation((_event, callback) => {
           // Simulate immediate response
           setTimeout(() => {
             callback({ type: 'content', content: 'Hello!', done: false })

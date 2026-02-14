@@ -1,7 +1,226 @@
+import { useState } from 'react'
 import ChatDialog from './components/chat/ChatDialog'
+import SettingsDialog from './components/settings/SettingsDialog'
+import Timeline from './components/timeline/Timeline'
+import VideoPreview from './components/video/VideoPreview'
+import FileImportZone from './components/import/FileImportZone'
+import FileList from './components/import/FileList'
+import WorkflowPresets from './components/presets/WorkflowPresets'
+
+type View = 'chat' | 'timeline' | 'import' | 'presets'
+
+interface ImportedFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  duration?: number
+  resolution?: string
+  path?: string
+}
+
+interface Operation {
+  id: string
+  name: string
+  type: string
+  timestamp: number
+  status: 'success' | 'failed' | 'pending'
+  input?: string
+  output?: string
+  parameters?: Record<string, any>
+  error?: string
+}
 
 function App() {
-  return <ChatDialog />
+  const [activeView, setActiveView] = useState<View>('chat')
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [importedFiles, setImportedFiles] = useState<ImportedFile[]>([])
+  const [selectedFileId, setSelectedFileId] = useState<string>()
+  const [operations] = useState<Operation[]>([])
+  const [currentVideoPath, setCurrentVideoPath] = useState<string>()
+
+  const handleFilesAdded = (files: File[]) => {
+    const newFiles: ImportedFile[] = files.map((file) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      // In production, these would be extracted from the file
+      duration: undefined,
+      resolution: undefined,
+      path: URL.createObjectURL(file),
+    }))
+    setImportedFiles((prev) => [...prev, ...newFiles])
+  }
+
+  const handleRemoveFile = (id: string) => {
+    setImportedFiles((prev) => prev.filter((f) => f.id !== id))
+    if (selectedFileId === id) {
+      setSelectedFileId(undefined)
+      setCurrentVideoPath(undefined)
+    }
+  }
+
+  const handleSelectFile = (id: string) => {
+    setSelectedFileId(id)
+    const file = importedFiles.find((f) => f.id === id)
+    if (file?.path) {
+      setCurrentVideoPath(file.path)
+    }
+  }
+
+  const handleOperationClick = (operation: Operation) => {
+    // In production, this would jump to the operation output
+    if (operation.output) {
+      setCurrentVideoPath(operation.output)
+    }
+  }
+
+  const handlePresetSelect = (preset: any) => {
+    // In production, this would execute the preset workflow
+    console.log('Selected preset:', preset)
+    // Could integrate with chat to send a message like:
+    // "Execute the ${preset.name} workflow"
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-background text-foreground">
+      {/* Top Navigation Bar */}
+      <div className="border-b border-border px-6 py-3 flex items-center justify-between bg-background">
+        <div className="flex items-center space-x-6">
+          <h1 className="text-xl font-bold text-primary">MCP Video Editor</h1>
+
+          <nav className="flex space-x-1">
+            <button
+              onClick={() => setActiveView('chat')}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                activeView === 'chat'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-secondary text-muted-foreground'
+              }`}
+            >
+              💬 Chat
+            </button>
+            <button
+              onClick={() => setActiveView('timeline')}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                activeView === 'timeline'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-secondary text-muted-foreground'
+              }`}
+            >
+              📋 Timeline
+            </button>
+            <button
+              onClick={() => setActiveView('import')}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                activeView === 'import'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-secondary text-muted-foreground'
+              }`}
+            >
+              📁 Files
+            </button>
+            <button
+              onClick={() => setActiveView('presets')}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                activeView === 'presets'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-secondary text-muted-foreground'
+              }`}
+            >
+              ⚡ Presets
+            </button>
+          </nav>
+        </div>
+
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="px-4 py-2 border border-border rounded-md hover:bg-secondary transition-colors"
+        >
+          ⚙️ Settings
+        </button>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Views */}
+        <div className="flex-1 overflow-hidden">
+          {activeView === 'chat' && (
+            <ChatDialog />
+          )}
+
+          {activeView === 'timeline' && (
+            <div className="h-full overflow-y-auto p-6">
+              <Timeline
+                operations={operations}
+                onOperationClick={handleOperationClick}
+                onUndo={() => console.log('Undo')}
+                onRedo={() => console.log('Redo')}
+                canUndo={operations.length > 0}
+                canRedo={false}
+              />
+            </div>
+          )}
+
+          {activeView === 'import' && (
+            <div className="h-full overflow-y-auto p-6 space-y-6">
+              <FileImportZone onFilesAdded={handleFilesAdded} />
+              <div>
+                <h3 className="text-lg font-semibold mb-4">
+                  Imported Files ({importedFiles.length})
+                </h3>
+                <FileList
+                  files={importedFiles}
+                  onRemoveFile={handleRemoveFile}
+                  onSelectFile={handleSelectFile}
+                  selectedFileId={selectedFileId}
+                />
+              </div>
+            </div>
+          )}
+
+          {activeView === 'presets' && (
+            <div className="h-full overflow-y-auto p-6">
+              <WorkflowPresets onSelectPreset={handlePresetSelect} />
+            </div>
+          )}
+        </div>
+
+        {/* Right Panel - Video Preview */}
+        <div className="w-[480px] border-l border-border p-4 overflow-y-auto bg-secondary/20">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">
+              Video Preview
+            </h3>
+          </div>
+          <VideoPreview videoPath={currentVideoPath} />
+
+          {currentVideoPath && (
+            <div className="mt-4 p-3 bg-background border border-border rounded-lg">
+              <h4 className="text-sm font-semibold mb-2">Current File</h4>
+              <p className="text-xs text-muted-foreground break-all">
+                {currentVideoPath}
+              </p>
+            </div>
+          )}
+
+          {!currentVideoPath && (
+            <div className="mt-4 p-4 bg-background border border-dashed border-border rounded-lg text-center text-muted-foreground">
+              <p className="text-sm">No video loaded</p>
+              <p className="text-xs mt-1">Import or create a video to preview</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Settings Dialog */}
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+    </div>
+  )
 }
 
 export default App

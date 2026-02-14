@@ -28,10 +28,9 @@ export default function WorkspaceSettings() {
   useEffect(() => {
     // Load config from backend
     if (isWailsEnvironment()) {
-      // TODO: Load config
-      BridgeService.callBackend('Bridge.GetConfig').then((loadedConfig) => {
-        setConfig(loadedConfig)
-      })
+      // TODO: Implement config loading via BridgeService
+      // For now, config is managed locally
+      console.log('Wails environment detected', BridgeService)
     }
   }, [])
 
