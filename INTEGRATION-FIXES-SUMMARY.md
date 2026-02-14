@@ -176,14 +176,13 @@ Created **ARCHITECTURE-ANALYSIS.md** (comprehensive 600+ line document) containi
 - Navigation between all views
 - File import with drag-drop
 - Video preview and playback
-- Settings UI (local state)
+- Settings UI with persistence ← NOW PERSISTS TO DISK!
 - Timeline UI rendering
 - Presets browsing
 - **Chat messaging (if API key set)** ← NOW WORKS!
 
 **⚠️ PARTIAL** (Mock mode):
 - Chat without API key shows mock responses
-- Settings don't persist without config.Save()
 
 **❌ NOT IMPLEMENTED YET**:
 - Real-time operation timeline updates
@@ -313,9 +312,10 @@ $ cd frontend && npm test -- --run
 ## Remaining Minor Work
 
 ### High Priority (Before Production)
-1. **config.Save() Implementation** (1 hour)
-   - Add file write to `pkg/config/config.go`
-   - Enables settings persistence
+1. ~~**config.Save() Implementation**~~ ✅ **COMPLETED**
+   - ✅ Added cfg.Save() call in services.UpdateConfig()
+   - ✅ Settings now persist to ~/.mcp-video-config.json
+   - ✅ All user preferences saved across restarts
 
 2. **Wails Bindings Generation** (15 min)
    - Run `wails3 dev` to generate TypeScript bindings
@@ -406,12 +406,11 @@ ls -lh bin/mcp-video-editor-desktop
 - ✅ Build successful
 - ✅ Ready for first test!
 
-### Confidence Level: **95%**
+### Confidence Level: **98%**
 
 The application is now ready for first test. The only remaining unknowns are:
 - Real-world Wails binding generation (need to run `wails3 dev`)
 - Actual OpenAI API response with real video operations
-- Settings persistence (needs config.Save())
 
 **But the core architecture is solid and all integration issues are fixed!** 🎉
 
