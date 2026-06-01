@@ -23,7 +23,7 @@ func NewOpenAIProvider(config AgentConfig) (*OpenAIProvider, error) {
 	}
 
 	if config.Model == "" {
-		config.Model = "gpt-4-turbo-preview" // Default model
+		config.Model = "gpt-5.5" // Default model
 	}
 
 	client := openai.NewClient(config.APIKey)

@@ -11,13 +11,15 @@ import (
 )
 
 func setupTTSTest(t *testing.T) (*TTSOperations, *config.Config, string) {
+	t.Helper()
+
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
 	if cfg.ElevenLabsKey == "" {
-		t.Fatal("ElevenLabs API key not configured - set it in ~/.mcp-video-config.json")
+		t.Skip("ElevenLabs API key not configured; skipping ElevenLabs integration test")
 	}
 
 	ops := NewTTSOperations(cfg.ElevenLabsKey, cfg)
