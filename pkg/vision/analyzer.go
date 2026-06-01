@@ -73,7 +73,7 @@ func NewAnalyzer(apiKey string, videoOps *video.Operations, ffmpegMgr *ffmpeg.Ma
 	}
 }
 
-// AnalyzeFrame analyzes a single frame with GPT-4 Vision
+// AnalyzeFrame analyzes a single frame with the configured OpenAI vision model.
 func (a *Analyzer) AnalyzeFrame(ctx context.Context, imagePath string, prompt string) (string, error) {
 	if a.client == nil {
 		return "", fmt.Errorf("OpenAI API key not configured")
@@ -93,9 +93,9 @@ func (a *Analyzer) AnalyzeFrame(ctx context.Context, imagePath string, prompt st
 		prompt = "Describe what you see in this video frame in detail. Include any visible objects, people, text, actions, and the overall scene."
 	}
 
-	// Call GPT-4 Vision API
+	// Call the configured OpenAI vision model.
 	resp, err := a.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: openai.GPT4o,
+		Model: "gpt-5.5",
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role: openai.ChatMessageRoleUser,
@@ -113,7 +113,7 @@ func (a *Analyzer) AnalyzeFrame(ctx context.Context, imagePath string, prompt st
 				},
 			},
 		},
-		MaxTokens: 500,
+		MaxCompletionTokens: 4000,
 	})
 
 	if err != nil {
@@ -327,11 +327,11 @@ func (a *Analyzer) CompareFrames(ctx context.Context, videoPath string, timestam
 	base64Image1 := base64.StdEncoding.EncodeToString(imageData1)
 	base64Image2 := base64.StdEncoding.EncodeToString(imageData2)
 
-	// Compare frames using GPT-4 Vision
+	// Compare frames using the configured OpenAI vision model.
 	prompt := "Compare these two video frames. Describe the differences, similarities, and any notable changes between them."
 
 	resp, err := a.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: openai.GPT4o,
+		Model: "gpt-5.5",
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role: openai.ChatMessageRoleUser,
@@ -355,7 +355,7 @@ func (a *Analyzer) CompareFrames(ctx context.Context, videoPath string, timestam
 				},
 			},
 		},
-		MaxTokens: 500,
+		MaxCompletionTokens: 4000,
 	})
 
 	if err != nil {
@@ -390,14 +390,14 @@ func (a *Analyzer) generateSummary(ctx context.Context, frames []FrameAnalysis) 
 	}
 
 	resp, err := a.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: openai.GPT4o,
+		Model: "gpt-5.5",
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleUser,
 				Content: prompt,
 			},
 		},
-		MaxTokens: 300,
+		MaxCompletionTokens: 4000,
 	})
 
 	if err != nil {
