@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/chandler-mayo/mcp-video-editor/pkg/config"
+	"github.com/chandler-mayo/mcp-video-editor/pkg/multitake"
 )
 
 func setupServerTest(t *testing.T) (*MCPServer, string) {
@@ -210,6 +211,93 @@ func TestHandleConcatenateVideos(t *testing.T) {
 
 	if result == nil {
 		t.Fatal("Expected result, got nil")
+	}
+}
+
+func TestHandleAssembleBestTakesCreatesOutput(t *testing.T) {
+	server, testDir := setupServerTest(t)
+	defer cleanup(testDir)
+	server.multitake = multitake.NewManagerWithFFmpeg(filepath.Join(testDir, "multi-projects"), server.ffmpeg)
+
+	video1 := filepath.Join(testDir, "take1.mp4")
+	video2 := filepath.Join(testDir, "take2.mp4")
+	createTestVideo(t, video1)
+	createTestVideo(t, video2)
+
+	projectRoot := filepath.Join(testDir, "assemble-project")
+	project, err := server.multitake.CreateProject("assemble project", "line one\nline two", &projectRoot)
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	project.BestTakes = []multitake.BestTake{
+		{SectionID: "section-1", TakeID: "take-1", FilePath: video1, Score: 90},
+		{SectionID: "section-2", TakeID: "take-2", FilePath: video2, Score: 88},
+	}
+	if err := server.multitake.SaveProject(project); err != nil {
+		t.Fatalf("SaveProject failed: %v", err)
+	}
+
+	outputPath := filepath.Join(testDir, "assembled.mp4")
+	result, err := server.handleAssembleBestTakes(map[string]interface{}{
+		"projectId": project.ID,
+		"output":    outputPath,
+	})
+	if err != nil {
+		t.Fatalf("handleAssembleBestTakes failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected result, got nil")
+	}
+	if result.IsError {
+		t.Fatalf("Expected success result, got error: %#v", result.Content)
+	}
+
+	info, err := os.Stat(outputPath)
+	if err != nil {
+		t.Fatalf("Expected assembled output file: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("Expected assembled output to be non-empty")
+	}
+}
+
+func TestHandleAssembleBestTakesRejectsDirectoryOutput(t *testing.T) {
+	server, testDir := setupServerTest(t)
+	defer cleanup(testDir)
+	server.multitake = multitake.NewManagerWithFFmpeg(filepath.Join(testDir, "multi-projects"), server.ffmpeg)
+
+	videoPath := filepath.Join(testDir, "take.mp4")
+	createTestVideo(t, videoPath)
+
+	projectRoot := filepath.Join(testDir, "assemble-error-project")
+	project, err := server.multitake.CreateProject("assemble error project", "line one", &projectRoot)
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	project.BestTakes = []multitake.BestTake{
+		{SectionID: "section-1", TakeID: "take-1", FilePath: videoPath, Score: 90},
+	}
+	if err := server.multitake.SaveProject(project); err != nil {
+		t.Fatalf("SaveProject failed: %v", err)
+	}
+
+	outputPath := filepath.Join(testDir, "output-directory")
+	if err := os.Mkdir(outputPath, 0755); err != nil {
+		t.Fatalf("Failed to create output directory fixture: %v", err)
+	}
+
+	result, err := server.handleAssembleBestTakes(map[string]interface{}{
+		"projectId": project.ID,
+		"output":    outputPath,
+	})
+	if err != nil {
+		t.Fatalf("handleAssembleBestTakes returned unexpected Go error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("Expected result, got nil")
+	}
+	if !result.IsError {
+		t.Fatalf("Expected MCP error result for directory output, got: %#v", result.Content)
 	}
 }
 

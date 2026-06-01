@@ -68,7 +68,7 @@ func NewMCPServer(cfg *config.Config) (*MCPServer, error) {
 	elementsOps := elements.NewOperations(ffmpegMgr)
 	transcriptOps := transcript.NewOperations(cfg.OpenAIKey, ffmpegMgr)
 	timelineMgr := timeline.NewManager("")
-	multitakeMgr := multitake.NewManager("")
+	multitakeMgr := multitake.NewManagerWithFFmpeg("", ffmpegMgr)
 	visionAnalyzer := vision.NewAnalyzer(cfg.OpenAIKey, videoOps, ffmpegMgr)
 	diagramGen := diagrams.NewGenerator()
 
