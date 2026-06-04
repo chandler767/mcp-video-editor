@@ -9,6 +9,7 @@ import (
 // Config holds all configuration for the MCP video editor
 type Config struct {
 	OpenAIKey        string            `json:"openaiApiKey"`
+	WhisperBaseURL   string            `json:"whisperBaseURL,omitempty"`
 	ClaudeAPIKey     string            `json:"claudeApiKey,omitempty"`
 	ElevenLabsKey    string            `json:"elevenLabsApiKey,omitempty"`
 	ElevenLabsVoices map[string]string `json:"elevenLabsVoices,omitempty"`
@@ -16,8 +17,8 @@ type Config struct {
 	FFprobePath      string            `json:"ffprobePath,omitempty"`
 	DefaultQuality   string            `json:"defaultQuality,omitempty"`
 	TempDir          string            `json:"tempDir,omitempty"`
-	AgentProvider    string            `json:"agentProvider,omitempty"` // "claude" or "openai"
-	AgentModel       string            `json:"agentModel,omitempty"`    // Model to use
+	AgentProvider    string            `json:"agentProvider,omitempty"`  // "claude" or "openai"
+	AgentModel       string            `json:"agentModel,omitempty"`     // Model to use
 	LastProjectDir   string            `json:"lastProjectDir,omitempty"` // Remember last project directory
 }
 
@@ -43,6 +44,11 @@ func Load() (*Config, error) {
 	// Override with environment variables if set
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
 		cfg.OpenAIKey = key
+	}
+	if baseURL := os.Getenv("OPENAI_WHISPER_BASE_URL"); baseURL != "" {
+		cfg.WhisperBaseURL = baseURL
+	} else if baseURL := os.Getenv("WHISPER_BASE_URL"); baseURL != "" {
+		cfg.WhisperBaseURL = baseURL
 	}
 	if key := os.Getenv("CLAUDE_API_KEY"); key != "" {
 		cfg.ClaudeAPIKey = key
@@ -94,6 +100,10 @@ func (c *Config) Update(updates map[string]interface{}) error {
 			if v, ok := value.(string); ok {
 				c.OpenAIKey = v
 			}
+		case "whisperBaseURL", "openaiWhisperBaseURL":
+			if v, ok := value.(string); ok {
+				c.WhisperBaseURL = v
+			}
 		case "claudeKey", "claudeApiKey":
 			if v, ok := value.(string); ok {
 				c.ClaudeAPIKey = v
@@ -138,6 +148,7 @@ func (c *Config) Update(updates map[string]interface{}) error {
 // Reset resets configuration to defaults
 func (c *Config) Reset() error {
 	c.OpenAIKey = ""
+	c.WhisperBaseURL = ""
 	c.ClaudeAPIKey = ""
 	c.ElevenLabsKey = ""
 	c.ElevenLabsVoices = nil
@@ -155,6 +166,7 @@ func (c *Config) Reset() error {
 func (c *Config) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"openaiKey":        maskAPIKey(c.OpenAIKey),
+		"whisperBaseURL":   c.WhisperBaseURL,
 		"claudeKey":        maskAPIKey(c.ClaudeAPIKey),
 		"elevenLabsKey":    maskAPIKey(c.ElevenLabsKey),
 		"elevenLabsVoices": c.ElevenLabsVoices,

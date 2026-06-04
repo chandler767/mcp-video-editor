@@ -52,22 +52,37 @@ type TimeRange struct {
 
 // Operations handles transcript operations
 type Operations struct {
-	client         *openai.Client
-	ffmpeg         *ffmpeg.Manager
-	maxFileSize    int64
-	chunkDuration  float64
+	client        *openai.Client
+	ffmpeg        *ffmpeg.Manager
+	maxFileSize   int64
+	chunkDuration float64
 }
 
 const (
 	MaxFileSize   = 24 * 1024 * 1024 // 24MB
-	ChunkDuration = 600.0             // 10 minutes
+	ChunkDuration = 600.0            // 10 minutes
 )
 
 // NewOperations creates a new transcript operations handler
 func NewOperations(apiKey string, mgr *ffmpeg.Manager) *Operations {
+	return NewOperationsWithBaseURL(apiKey, "", mgr)
+}
+
+// NewOperationsWithBaseURL creates a transcript handler with an optional
+// OpenAI-compatible Whisper endpoint for local transcription servers.
+func NewOperationsWithBaseURL(apiKey string, whisperBaseURL string, mgr *ffmpeg.Manager) *Operations {
 	var client *openai.Client
-	if apiKey != "" {
-		client = openai.NewClient(apiKey)
+	if apiKey != "" || whisperBaseURL != "" {
+		if apiKey == "" {
+			apiKey = "local-whisper"
+		}
+		if whisperBaseURL != "" {
+			cfg := openai.DefaultConfig(apiKey)
+			cfg.BaseURL = strings.TrimRight(whisperBaseURL, "/")
+			client = openai.NewClientWithConfig(cfg)
+		} else {
+			client = openai.NewClient(apiKey)
+		}
 	}
 	return &Operations{
 		client:        client,
