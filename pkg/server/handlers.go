@@ -1493,11 +1493,29 @@ func (s *MCPServer) handleAssembleBestTakes(arguments map[string]interface{}) (*
 	if err := s.multitake.AssembleFinal(project, args.Output); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Failed to assemble video: %v", err)), nil
 	}
+	if err := validateAssembledOutput(args.Output); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to assemble video: %v", err)), nil
+	}
 
 	result := fmt.Sprintf("Final video assembled successfully!\nOutput: %s",
 		args.Output)
 
 	return mcp.NewToolResultText(result), nil
+}
+
+func validateAssembledOutput(outputPath string) error {
+	info, err := os.Stat(outputPath)
+	if err != nil {
+		return fmt.Errorf("assembled output not found: %s", outputPath)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("assembled output is a directory: %s", outputPath)
+	}
+	if info.Size() == 0 {
+		return fmt.Errorf("assembled output is empty: %s", outputPath)
+	}
+
+	return nil
 }
 
 func (s *MCPServer) handleListMultiTakeProjects(arguments map[string]interface{}) (*mcp.CallToolResult, error) {

@@ -53,6 +53,8 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+*.pre-gpt55-bak
+*.precompiled-bak
 temp/
 tmp/
 .mcp-video-vision-temp/

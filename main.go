@@ -39,9 +39,6 @@ func main() {
 		log.Fatalf("Failed to create services: %v", err)
 	}
 
-	// Create Wails bridge
-	bridge := wailsbridge.NewBridge(services)
-
 	// Log initialization
 	fmt.Fprintln(os.Stderr, "MCP Video Editor Desktop - Starting...")
 	fmt.Fprintf(os.Stderr, "FFmpeg initialized successfully\n")
@@ -59,9 +56,6 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "MCP Video Editor",
 		Description: "AI-powered video editing desktop application",
-		Services: []application.Service{
-			application.NewService(bridge),
-		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
@@ -69,6 +63,10 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+
+	// Create Wails bridge after app initialization because the bridge uses app dialogs.
+	bridge := wailsbridge.NewBridge(app, services)
+	app.RegisterService(application.NewService(bridge))
 
 	// Create main window
 	app.Window.NewWithOptions(application.WebviewWindowOptions{

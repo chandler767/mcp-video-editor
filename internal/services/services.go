@@ -80,7 +80,7 @@ func getAgentModel(cfg *config.Config) string {
 	// Use defaults based on provider
 	provider := getAgentProvider(cfg)
 	if provider == "openai" {
-		return "gpt-4-turbo"
+		return "gpt-5.5"
 	}
 	return "claude-opus-4-6"
 }

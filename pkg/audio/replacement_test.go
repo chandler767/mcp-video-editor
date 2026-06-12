@@ -77,11 +77,11 @@ func TestReplaceWord(t *testing.T) {
 	}
 
 	if cfg.OpenAIKey == "" {
-		t.Fatal("OpenAI API key not configured - set it in ~/.mcp-video-config.json")
+		t.Skip("OpenAI API key not configured; skipping word replacement integration test")
 	}
 
 	if cfg.ElevenLabsKey == "" {
-		t.Fatal("ElevenLabs API key not configured - set it in ~/.mcp-video-config.json")
+		t.Skip("ElevenLabs API key not configured; skipping word replacement integration test")
 	}
 
 	// Setup

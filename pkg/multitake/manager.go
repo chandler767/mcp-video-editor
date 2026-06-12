@@ -1,6 +1,7 @@
 package multitake
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,21 +9,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chandler-mayo/mcp-video-editor/pkg/ffmpeg"
 	"github.com/google/uuid"
 )
 
 // Project represents a multi-take project
 type Project struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Created     time.Time         `json:"created"`
-	Modified    time.Time         `json:"modified"`
-	Script      string            `json:"script"`
-	Sections    []ScriptSection   `json:"sections"`
-	Takes       []Take            `json:"takes"`
-	BestTakes   []BestTake        `json:"bestTakes,omitempty"`
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Created     time.Time          `json:"created"`
+	Modified    time.Time          `json:"modified"`
+	Script      string             `json:"script"`
+	Sections    []ScriptSection    `json:"sections"`
+	Takes       []Take             `json:"takes"`
+	BestTakes   []BestTake         `json:"bestTakes,omitempty"`
 	Directories ProjectDirectories `json:"directories"`
-	Status      string            `json:"status"` // setup, analyzing, selecting, complete
+	Status      string             `json:"status"` // setup, analyzing, selecting, complete
 }
 
 // ScriptSection represents a section of the script
@@ -34,14 +36,14 @@ type ScriptSection struct {
 
 // Take represents a single video take
 type Take struct {
-	ID          string     `json:"id"`
-	FilePath    string     `json:"filePath"`
-	FileName    string     `json:"fileName"`
-	Analyzed    bool       `json:"analyzed"`
-	Score       float64    `json:"score"`       // 0-100
-	Issues      []string   `json:"issues"`
-	Transcript  *string    `json:"transcript,omitempty"`
-	AnalyzedAt  *time.Time `json:"analyzedAt,omitempty"`
+	ID         string     `json:"id"`
+	FilePath   string     `json:"filePath"`
+	FileName   string     `json:"fileName"`
+	Analyzed   bool       `json:"analyzed"`
+	Score      float64    `json:"score"` // 0-100
+	Issues     []string   `json:"issues"`
+	Transcript *string    `json:"transcript,omitempty"`
+	AnalyzedAt *time.Time `json:"analyzedAt,omitempty"`
 }
 
 // BestTake represents the best take for a script section
@@ -65,15 +67,21 @@ type ProjectDirectories struct {
 // Manager handles multi-take projects
 type Manager struct {
 	baseDir string
+	ffmpeg  *ffmpeg.Manager
 }
 
 // NewManager creates a new multi-take manager
 func NewManager(baseDir string) *Manager {
+	return NewManagerWithFFmpeg(baseDir, nil)
+}
+
+// NewManagerWithFFmpeg creates a new multi-take manager using an existing FFmpeg manager.
+func NewManagerWithFFmpeg(baseDir string, ffmpegMgr *ffmpeg.Manager) *Manager {
 	if baseDir == "" {
 		baseDir, _ = os.Getwd()
 		baseDir = filepath.Join(baseDir, ".mcp-multi-take-projects")
 	}
-	return &Manager{baseDir: baseDir}
+	return &Manager{baseDir: baseDir, ffmpeg: ffmpegMgr}
 }
 
 // Initialize creates the projects directory
@@ -292,20 +300,195 @@ func (m *Manager) SelectBestTakes(project *Project) error {
 	return m.SaveProject(project)
 }
 
-// AssembleFinal assembles the final video from best takes (placeholder)
+// AssembleFinal assembles the final video from selected best takes.
 func (m *Manager) AssembleFinal(project *Project, outputPath string) error {
 	if len(project.BestTakes) == 0 {
 		return fmt.Errorf("no best takes selected")
 	}
+	if strings.TrimSpace(outputPath) == "" {
+		return fmt.Errorf("output path is required")
+	}
 
-	// In a full implementation, this would:
-	// 1. Extract segments from each best take
-	// 2. Apply transitions between segments
-	// 3. Concatenate into final video
-	// 4. Export to output path
+	inputs, err := selectedTakePaths(project)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	ffmpegMgr, err := m.ffmpegManager()
+	if err != nil {
+		return err
+	}
+
+	if err := renderSelectedTakes(context.Background(), ffmpegMgr, inputs, outputPath); err != nil {
+		return err
+	}
+
+	if err := validateRenderedOutput(outputPath); err != nil {
+		return err
+	}
 
 	project.Status = "complete"
 	return m.SaveProject(project)
+}
+
+func (m *Manager) ffmpegManager() (*ffmpeg.Manager, error) {
+	if m.ffmpeg != nil {
+		return m.ffmpeg, nil
+	}
+
+	ffmpegMgr, err := ffmpeg.NewManager("", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize FFmpeg: %w", err)
+	}
+	m.ffmpeg = ffmpegMgr
+
+	return ffmpegMgr, nil
+}
+
+func selectedTakePaths(project *Project) ([]string, error) {
+	takesByID := make(map[string]string, len(project.Takes))
+	for _, take := range project.Takes {
+		takesByID[take.ID] = take.FilePath
+	}
+
+	inputs := make([]string, 0, len(project.BestTakes))
+	for i, bestTake := range project.BestTakes {
+		inputPath := strings.TrimSpace(bestTake.FilePath)
+		if inputPath == "" && bestTake.TakeID != "" {
+			inputPath = takesByID[bestTake.TakeID]
+		}
+		if inputPath == "" {
+			return nil, fmt.Errorf("selected take %d has no file path", i+1)
+		}
+
+		info, err := os.Stat(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("selected take file not found: %s", inputPath)
+		}
+		if info.IsDir() {
+			return nil, fmt.Errorf("selected take path is a directory: %s", inputPath)
+		}
+
+		inputs = append(inputs, inputPath)
+	}
+
+	return inputs, nil
+}
+
+func renderSelectedTakes(ctx context.Context, ffmpegMgr *ffmpeg.Manager, inputs []string, outputPath string) error {
+	if len(inputs) == 1 {
+		return renderSingleTake(ctx, ffmpegMgr, inputs[0], outputPath)
+	}
+	return renderConcatTakes(ctx, ffmpegMgr, inputs, outputPath)
+}
+
+func renderSingleTake(ctx context.Context, ffmpegMgr *ffmpeg.Manager, inputPath string, outputPath string) error {
+	args := []string{
+		"-i", inputPath,
+		"-c", "copy",
+		"-y",
+		outputPath,
+	}
+
+	if err := ffmpegMgr.Execute(ctx, args...); err != nil {
+		removePartialOutput(outputPath)
+		fallbackArgs := []string{
+			"-i", inputPath,
+			"-c:v", "libx264",
+			"-preset", "veryfast",
+			"-pix_fmt", "yuv420p",
+			"-c:a", "aac",
+			"-movflags", "+faststart",
+			"-y",
+			outputPath,
+		}
+		if fallbackErr := ffmpegMgr.Execute(ctx, fallbackArgs...); fallbackErr != nil {
+			return fmt.Errorf("failed to render selected take: copy failed: %v; transcode fallback failed: %w", err, fallbackErr)
+		}
+	}
+
+	return nil
+}
+
+func renderConcatTakes(ctx context.Context, ffmpegMgr *ffmpeg.Manager, inputs []string, outputPath string) error {
+	tempDir, err := os.MkdirTemp("", "mcp-multitake-assemble-*")
+	if err != nil {
+		return fmt.Errorf("failed to create concat temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	concatFile := filepath.Join(tempDir, "concat.txt")
+	lines := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		absPath, err := filepath.Abs(input)
+		if err != nil {
+			return fmt.Errorf("failed to resolve selected take path: %w", err)
+		}
+		lines = append(lines, fmt.Sprintf("file '%s'", escapeConcatPath(absPath)))
+	}
+
+	if err := os.WriteFile(concatFile, []byte(strings.Join(lines, "\n")), 0644); err != nil {
+		return fmt.Errorf("failed to create concat file: %w", err)
+	}
+
+	args := []string{
+		"-f", "concat",
+		"-safe", "0",
+		"-i", concatFile,
+		"-c", "copy",
+		"-y",
+		outputPath,
+	}
+	if err := ffmpegMgr.Execute(ctx, args...); err != nil {
+		removePartialOutput(outputPath)
+		fallbackArgs := []string{
+			"-f", "concat",
+			"-safe", "0",
+			"-i", concatFile,
+			"-c:v", "libx264",
+			"-preset", "veryfast",
+			"-pix_fmt", "yuv420p",
+			"-c:a", "aac",
+			"-movflags", "+faststart",
+			"-y",
+			outputPath,
+		}
+		if fallbackErr := ffmpegMgr.Execute(ctx, fallbackArgs...); fallbackErr != nil {
+			return fmt.Errorf("failed to concatenate selected takes: copy failed: %v; transcode fallback failed: %w", err, fallbackErr)
+		}
+	}
+
+	return nil
+}
+
+func escapeConcatPath(path string) string {
+	return strings.ReplaceAll(path, "'", "\\'")
+}
+
+func validateRenderedOutput(outputPath string) error {
+	info, err := os.Stat(outputPath)
+	if err != nil {
+		return fmt.Errorf("rendered output not found: %s", outputPath)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("rendered output is a directory: %s", outputPath)
+	}
+	if info.Size() == 0 {
+		return fmt.Errorf("rendered output is empty: %s", outputPath)
+	}
+
+	return nil
+}
+
+func removePartialOutput(outputPath string) {
+	info, err := os.Stat(outputPath)
+	if err == nil && !info.IsDir() {
+		_ = os.Remove(outputPath)
+	}
 }
 
 // ListProjects lists all projects
